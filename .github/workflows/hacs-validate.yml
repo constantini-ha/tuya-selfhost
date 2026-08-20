@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    if: github.repository_owner == 'make-all'
+    if: github.repository_owner == 'constantini-ha'
 
     steps:
       - uses: actions/checkout@v6
