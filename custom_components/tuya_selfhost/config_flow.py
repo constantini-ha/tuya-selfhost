@@ -41,6 +41,7 @@ from .const import (
 )
 from .device import TuyaLocalDevice
 from .helpers.config import get_device_id
+from .helpers import scanner
 from .helpers.device_config import get_config
 from .helpers.log import log_json
 
@@ -716,4 +717,6 @@ async def async_test_connection(config: dict, hass: HomeAssistant):
 
 
 def scan_for_device(devid):
-    return tinytuya.find_device(dev_id=devid)
+    # scanner próprio: tinytuya.find_device usa select(), que estoura com
+    # file descriptors > 1024 em processos grandes como o HA
+    return scanner.find_device(devid)

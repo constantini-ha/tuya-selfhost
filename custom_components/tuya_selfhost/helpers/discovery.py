@@ -37,13 +37,13 @@ References:
 import logging
 from datetime import timedelta
 
-import tinytuya
 from homeassistant.config_entries import SOURCE_INTEGRATION_DISCOVERY
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 
 from ..const import CONF_DEVICE_CID, CONF_DEVICE_ID, CONF_TYPE, DATA_DISCOVERY, DOMAIN
+from . import scanner
 from .config import get_device_id
 from .device_config import get_config
 
@@ -59,28 +59,26 @@ SWEEP_INTERVAL = timedelta(seconds=60)
 SCAN_INTERVAL = timedelta(minutes=10)
 
 
-def _find_device(device_id):
-    """Locate a device by id on the LAN (blocking; run in executor).
+def _find_devices(device_ids):
+    """Locate devices by id on the LAN (blocking; run in executor).
 
-    Sends the Tuya discovery request and returns the scanner result dict
-    (``{'ip': ..., 'id': ..., 'product_id': ..., ...}``), or a blank result on
-    any socket error.
+    One passive listen resolves every wanted id at once (``helpers.scanner``
+    avoids tinytuya's ``select()``-based loop, which breaks with fds > 1024).
+    Returns ``{gwId: info}``; empty on any error.
     """
     try:
-        return tinytuya.find_device(dev_id=device_id)
-    except OSError:
-        return {"ip": None}
+        return scanner.scan_devices(set(device_ids))
+    except Exception:
+        _LOGGER.exception("Falha na varredura LAN")
+        return {}
 
 
 def _scan_all():
-    """Scan the LAN for all Tuya devices (blocking; run in executor).
-
-    Returns tinytuya's dict keyed by IP, each value carrying ``gwId``,
-    ``productKey`` and ``version``; an empty dict on any socket error.
-    """
+    """Scan the LAN for all Tuya devices (blocking; run in executor)."""
     try:
-        return tinytuya.deviceScan(verbose=False, poll=False)
-    except OSError:
+        return scanner.scan_all()
+    except Exception:
+        _LOGGER.exception("Falha no scan completo da LAN")
         return {}
 
 
@@ -143,8 +141,11 @@ class TuyaLANRediscovery:
 
         self._scanning = True
         try:
+            located = await self._hass.async_add_executor_job(
+                _find_devices, [device_id for _, device_id in targets]
+            )
             for entry, device_id in targets:
-                found = await self._hass.async_add_executor_job(_find_device, device_id)
+                found = located.get(device_id)
                 ip = found.get("ip") if found else None
                 if not ip:
                     continue
