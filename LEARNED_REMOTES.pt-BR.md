@@ -9,6 +9,17 @@ marcas locais não falam, e nenhuma configuração muda isso.
 A saída é parar de adivinhar o protocolo e copiar o sinal: ensinar o seu controle
 físico ao blaster e depois repetir o que ele gravou.
 
+## O caminho fácil: a página Controles Tuya
+
+A integração traz um construtor. Abra **Controles Tuya** na barra lateral, crie um
+controle, acrescente botões com nome e ícone, e ensine um por um. Cada captura
+oferece **Testar / Manter / Descartar**, então uma leitura ruim nunca substitui
+uma boa em silêncio, e as setas embaixo de cada botão definem a posição dele.
+
+Quando o controle estiver pronto, **Adicionar ao painel** solta o cartão pronto na
+sua primeira visão. Tudo que vem abaixo é a mesma coisa feita na mão, para quem
+prefere YAML ou precisa disso dentro de uma automação.
+
 ## O que você precisa entender antes
 
 **Controle de ar-condicionado não manda "um grau a mais".** Cada toque transmite

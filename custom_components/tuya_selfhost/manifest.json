@@ -2,10 +2,14 @@
     "domain": "tuya_selfhost",
     "name": "Tuya Selfhost",
     "codeowners": [
-        "@make-all"
+        "@Constantini21"
     ],
     "config_flow": true,
-    "dependencies": [],
+    "dependencies": [
+        "frontend",
+        "http",
+        "panel_custom"
+    ],
     "documentation": "https://github.com/constantini-ha/tuya-selfhost",
     "integration_type": "device",
     "iot_class": "local_push",
@@ -18,5 +22,5 @@
         "tinytuya==1.20.0",
         "tuya-device-sharing-sdk~=0.2.4"
     ],
-    "version": "2026.7.3.7"
+    "version": "2026.7.4"
 }

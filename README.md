@@ -1,15 +1,18 @@
 > [!NOTE]
-> **Tuya Selfhost** é um fork mantido por [@Constantini21](https://github.com/Constantini21)
-> de [make-all/tuya-local](https://github.com/make-all/tuya-local), com configs de
-> dispositivos próprios (ex.: interruptor M606 de 6 teclas) e melhorias aplicadas antes
-> de irem para o upstream. Todo crédito da base ao projeto original.
+> **Tuya Selfhost** controla aparelhos Tuya/Smart Life pela rede local, sem nuvem,
+> mantido por [@Constantini21](https://github.com/Constantini21). Traz configs de
+> dispositivos próprias (ex.: interruptor M606 de 6 teclas), redescoberta automática
+> de IP na LAN, construtor de controles IR/RF e geração da configuração da Alexa.
+>
+> Nasceu a partir de [make-all/tuya-local](https://github.com/make-all/tuya-local)
+> (MIT) e segue reconhecendo essa base em [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)
+> e [LICENSE.md](LICENSE.md) — mas é um projeto próprio, com rumo próprio.
+> Se quiser apoiar o trabalho original:
+> [BuyMeCoffee do Jason Rumney](https://www.buymeacoffee.com/jasonrumney).
 
-![logo](custom_components/tuya_local/brand/icon.svg) 
+![logo](custom_components/tuya_selfhost/brand/icon.svg) 
 
-Please report any [issues](https://github.com/make-all/tuya-local/issues) and feel free to raise [pull requests](https://github.com/make-all/tuya-local/pulls).
-[Many others](https://github.com/make-all/tuya-local/blob/main/ACKNOWLEDGEMENTS.md) have contributed their help already.
-
-[![BuyMeCoffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/jasonrumney)
+Please report any [issues](https://github.com/constantini-ha/tuya-selfhost/issues) and feel free to raise [pull requests](https://github.com/constantini-ha/tuya-selfhost/pulls).
 
 This is a Home Assistant integration to support devices running Tuya
 firmware without going via the Tuya cloud.  Devices are supported
@@ -47,7 +50,7 @@ follow the [instructions for adding a custom
 repository](https://hacs.xyz/docs/faq/custom_repositories) and then
 the integration will be available to install like any other.
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=make-all&repository=tuya-local&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=constantini-ha&repository=tuya-selfhost&category=integration)
 
 ## Configuration
 
@@ -149,12 +152,16 @@ When no protocol integration speaks your appliance's dialect, teach the blaster
 your physical remote and replay the codes. Works with any brand, and the learned
 codes survive a device swap.
 
+Open **Controles Tuya** in the sidebar to build a remote button by button —
+name, icon and position — teaching each one with a Test / Keep / Discard step,
+then send the finished card straight to your dashboard.
+
 See [LEARNED_REMOTES.md](LEARNED_REMOTES.md) — also in
 [português](LEARNED_REMOTES.pt-BR.md) and [español](LEARNED_REMOTES.es.md).
 
 ## Device support
 
-A list of currently supported devices can be found in the [DEVICES.md](https://github.com/make-all/tuya-local/blob/main/DEVICES.md) file.
+A list of currently supported devices can be found in the [DEVICES.md](https://github.com/constantini-ha/tuya-selfhost/blob/main/DEVICES.md) file.
 
 Note that devices sometimes get firmware upgrades, or incompatible
 versions are sold under the same model name, so it is possible that
@@ -202,7 +209,7 @@ predefined (cloud only) device database, or climate device simulation.
 
 ## Contributing
 
-Documentation on building a device configuration file is in [/custom_components/tuya_local/devices/README.md](https://github.com/make-all/tuya-local/blob/main/custom_components/tuya_local/devices/README.md)
+Documentation on building a device configuration file is in [/custom_components/tuya_selfhost/devices/README.md](https://github.com/constantini-ha/tuya-selfhost/blob/main/custom_components/tuya_selfhost/devices/README.md)
 
 If your device is not listed, you can find the information required to add a configuration for it in the following locations:
 

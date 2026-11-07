@@ -31,6 +31,7 @@ from .const import (
 from .device import async_delete_device, get_device_id, setup_device
 from .helpers.device_config import get_config
 from .helpers.discovery import async_start_discovery, async_stop_discovery
+from .remote_card import async_setup_remote_card
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -1003,6 +1004,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # DHCP lease change) is relocated and reconnected without manual
     # reconfiguration. Safe to call repeatedly; only one sweeper is started.
     await async_start_discovery(hass)
+    await async_setup_remote_card(hass)
     config = {**entry.data, **entry.options, "name": entry.title}
     try:
         device = await hass.async_add_executor_job(setup_device, hass, config)

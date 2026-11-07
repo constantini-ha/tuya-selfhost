@@ -9,6 +9,17 @@ ventiladores de marcas locales no lo hacen, y ninguna configuración lo cambia.
 La salida es dejar de adivinar el protocolo y copiar la señal: enseñarle al
 blaster tu mando físico y después repetir lo que grabó.
 
+## La vía fácil: la página Controles Tuya
+
+La integración incluye un constructor. Abre **Controles Tuya** en la barra lateral,
+crea un mando, añade botones con nombre e icono, y enséñalos uno a uno. Cada
+captura ofrece **Probar / Conservar / Descartar**, así que una lectura mala nunca
+reemplaza en silencio a una buena, y las flechas bajo cada botón fijan su posición.
+
+Cuando el mando esté listo, **Añadir al panel** coloca la tarjeta terminada en tu
+primera vista. Todo lo que sigue es lo mismo hecho a mano, para quien prefiera
+YAML o lo necesite dentro de una automatización.
+
 ## Lo que hay que entender primero
 
 **Un mando de aire acondicionado no envía "un grado más".** Cada pulsación

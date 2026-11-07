@@ -9,6 +9,17 @@ local brands do not, and no amount of configuration will change that.
 The way out is to stop guessing the protocol and copy the signal instead: teach
 the blaster your physical remote, then replay it.
 
+## The easy way: the Controles Tuya page
+
+The integration ships a builder. Open **Controles Tuya** in the sidebar, create a
+control, add buttons with a name and an icon, and teach them one at a time. Each
+capture offers **Test / Keep / Discard**, so a bad reading never silently
+replaces a good one, and the arrows under each button set its position.
+
+When the control is ready, **Add to dashboard** drops the finished card into your
+first view. Everything below is the same thing done by hand, for anyone who
+prefers YAML or needs it inside an automation.
+
 ## The one thing to understand first
 
 **Air conditioner remotes do not send "one degree warmer".** Every press
