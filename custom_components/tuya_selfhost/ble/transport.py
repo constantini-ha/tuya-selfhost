@@ -21,6 +21,11 @@ _LOGGER = logging.getLogger(__name__)
 CALL_TIMEOUT = 30
 RECEIVE_TIMEOUT = 5
 
+# A Tuya module accepts one GATT session at a time, and the packet counter
+# belongs to that session, so every transport for an address shares one.
+_SHARED: dict[str, TuyaBLEDevice] = {}
+_SHARED_LOCK = asyncio.Lock()
+
 
 class StoredCredentials(AbstaractTuyaBLEDeviceManager):
     """Hands the protocol the credentials the config entry already holds."""
@@ -93,6 +98,15 @@ class TuyaBleTransport:
     async def _async_device(self) -> TuyaBLEDevice:
         if self._device is not None:
             return self._device
+        async with _SHARED_LOCK:
+            existing = _SHARED.get(self._address)
+            if existing is not None:
+                self._device = existing
+                existing.register_callback(self._on_datapoints)
+                return existing
+            return await self._async_connect()
+
+    async def _async_connect(self) -> TuyaBLEDevice:
         ble_device = bluetooth.async_ble_device_from_address(
             self._hass, self._address, connectable=True
         )
@@ -107,6 +121,7 @@ class TuyaBleTransport:
         device = TuyaBLEDevice(manager, ble_device)
         await device.initialize()
         device.register_callback(self._on_datapoints)
+        _SHARED[self._address] = device
         self._device = device
         return device
 
@@ -175,9 +190,10 @@ class TuyaBleTransport:
         return None
 
     def close(self) -> None:
-        if self._device is not None:
-            self._run(self._device.stop())
-            self._device = None
+        device = _SHARED.pop(self._address, None)
+        if device is not None:
+            self._run(device.stop())
+        self._device = None
 
 
 def _guess_type(value: Any) -> TuyaBLEDataPointType:
