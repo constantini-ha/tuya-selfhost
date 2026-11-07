@@ -14,6 +14,7 @@ from homeassistant.components.remote import DOMAIN as REMOTE_DOMAIN
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import service
 
 from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
@@ -42,6 +43,13 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
         )
     hass.services.async_register(
         DOMAIN,
+        "alexa_config",
+        partial(async_handle_alexa_config, hass),
+        schema=vol.Schema({}),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN,
         "network_report",
         partial(async_handle_network_report, hass),
         schema=vol.Schema({}),
@@ -49,6 +57,68 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
     )
     return True
 
+
+# Domains the Alexa Smart Home integration can expose.
+ALEXA_DOMAINS = frozenset(
+    {
+        "binary_sensor",
+        "climate",
+        "cover",
+        "fan",
+        "humidifier",
+        "light",
+        "lock",
+        "sensor",
+        "switch",
+        "vacuum",
+        "water_heater",
+    }
+)
+
+
+def _yaml_quote(value: str) -> str:
+    """Quote a scalar so any character is safe inside generated YAML."""
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
+    """Build an alexa: block covering every Tuya Selfhost entity."""
+    registry = er.async_get(hass)
+    entities = []
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        for item in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if item.disabled_by or item.hidden_by or item.domain not in ALEXA_DOMAINS:
+                continue
+            state = hass.states.get(item.entity_id)
+            name = (
+                (state.attributes.get("friendly_name") if state else None)
+                or item.name
+                or item.original_name
+                or item.entity_id
+            )
+            entities.append((item.entity_id, str(name)))
+    entities.sort()
+
+    lines = [
+        "alexa:",
+        "  smart_home:",
+        f"    locale: {hass.config.language}  # check against your Alexa account",
+        "    # Proactive state reporting: without these three the Alexa app shows",
+        "    # a stale state when something changes outside Alexa. The credentials",
+        "    # come from your skill: Build > Permissions > Send Alexa Events.",
+        "    # endpoint: https://api.amazonalexa.com/v3/events",
+        "    # client_id: !secret alexa_client_id",
+        "    # client_secret: !secret alexa_client_secret",
+        "    filter:",
+        "      include_entities:",
+    ]
+    lines += [f"        - {entity_id}" for entity_id, _ in entities]
+    lines.append("    entity_config:")
+    for entity_id, name in entities:
+        lines.append(f"      {entity_id}:")
+        lines.append(f"        name: {_yaml_quote(name)}")
+
+    return {"yaml": "\n".join(lines), "entity_count": len(entities)}
 
 def _read_arp_table() -> dict[str, str]:
     """Map IP to MAC from the kernel ARP cache."""

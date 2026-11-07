@@ -141,6 +141,10 @@
         "network_report": {
             "name": "Network report",
             "description": "Lists the configured devices with their IP and MAC so you can block the ones that no longer need the Internet at your router."
+        },
+        "alexa_config": {
+            "name": "Alexa configuration",
+            "description": "Builds a ready-to-paste alexa: block listing every Tuya Selfhost entity, so you do not have to type entity IDs by hand."
         }
     },
     "entity": {

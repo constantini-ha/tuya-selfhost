@@ -23,3 +23,6 @@ send_learned_ir_command:
 
 network_report:
   fields: {}
+
+alexa_config:
+  fields: {}

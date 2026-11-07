@@ -134,6 +134,15 @@ Assistant.
 
 ---
 
+## Alexa
+
+Your devices can be exposed to Alexa through a self-hosted Smart Home skill, with
+no Nabu Casa subscription. The **Alexa configuration** action builds the whole
+`alexa:` block for you, so you never type an entity ID by hand.
+
+See [ALEXA.md](ALEXA.md) — also in [português](ALEXA.pt-BR.md) and
+[español](ALEXA.es.md).
+
 ## Device support
 
 A list of currently supported devices can be found in the [DEVICES.md](https://github.com/make-all/tuya-local/blob/main/DEVICES.md) file.

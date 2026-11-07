@@ -6,10 +6,10 @@
     ],
     "config_flow": true,
     "dependencies": [],
-    "documentation": "https://github.com/Constantini21/tuya-selfhost",
+    "documentation": "https://github.com/constantini-ha/tuya-selfhost",
     "integration_type": "device",
     "iot_class": "local_push",
-    "issue_tracker": "https://github.com/Constantini21/tuya-selfhost/issues",
+    "issue_tracker": "https://github.com/constantini-ha/tuya-selfhost/issues",
     "loggers": [
         "tuya_selfhost",
         "tinytuya"
@@ -18,5 +18,5 @@
         "tinytuya==1.20.0",
         "tuya-device-sharing-sdk~=0.2.4"
     ],
-    "version": "2026.7.3.5"
+    "version": "2026.7.3.6"
 }

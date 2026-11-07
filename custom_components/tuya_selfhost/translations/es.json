@@ -141,6 +141,10 @@
         "network_report": {
             "name": "Informe de red",
             "description": "Lista los dispositivos configurados con su IP y MAC para que bloquees en el router los que ya no necesitan Internet."
+        },
+        "alexa_config": {
+            "name": "Configuración de Alexa",
+            "description": "Genera un bloque alexa: listo para pegar con todas las entidades de Tuya Selfhost, para no escribir los IDs a mano."
         }
     },
     "entity": {
