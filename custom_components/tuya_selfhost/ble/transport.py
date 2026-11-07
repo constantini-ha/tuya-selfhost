@@ -10,6 +10,9 @@ from typing import Any
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 
+from homeassistant.components import bluetooth as ha_bluetooth
+
+from .discovery import uuid_from_advertisement
 from .manager import AbstaractTuyaBLEDeviceManager, TuyaBLEDeviceCredentials
 from .tuya_ble import TuyaBLEDataPoint, TuyaBLEDataPointType, TuyaBLEDevice
 
@@ -46,16 +49,36 @@ class TuyaBleTransport:
         self,
         hass: HomeAssistant,
         address: str,
-        credentials: TuyaBLEDeviceCredentials,
+        device_id: str,
+        local_key: str,
     ) -> None:
-        self.id = credentials.device_id
+        self.id = device_id
         self.parent = None
         self.disabledetect = True
         self._hass = hass
-        self._address = address
-        self._manager = StoredCredentials(credentials)
+        self._address = address.upper()
+        self._device_id = device_id
+        self._local_key = local_key
         self._device: TuyaBLEDevice | None = None
         self._updates: queue.Queue = queue.Queue()
+
+    def _credentials(self, service_info) -> TuyaBLEDeviceCredentials:
+        """Build credentials, taking the uuid from what the device broadcasts."""
+        uuid = uuid_from_advertisement(service_info)
+        if not uuid:
+            raise ConnectionError(
+                f"{self._address} does not broadcast a readable uuid"
+            )
+        return TuyaBLEDeviceCredentials(
+            uuid=uuid,
+            local_key=self._local_key,
+            device_id=self._device_id,
+            category="",
+            product_id="",
+            device_name=None,
+            product_model=None,
+            product_name=None,
+        )
 
     # ------------------------------------------------------------------
     # bridging
@@ -69,11 +92,17 @@ class TuyaBleTransport:
         if self._device is not None:
             return self._device
         ble_device = bluetooth.async_ble_device_from_address(
-            self._hass, self._address.upper(), connectable=True
+            self._hass, self._address, connectable=True
         )
         if ble_device is None:
             raise ConnectionError(f"{self._address} is out of Bluetooth range")
-        device = TuyaBLEDevice(self._manager, ble_device)
+        service_info = ha_bluetooth.async_last_service_info(
+            self._hass, self._address, connectable=True
+        )
+        if service_info is None:
+            raise ConnectionError(f"{self._address} has not advertised yet")
+        manager = StoredCredentials(self._credentials(service_info))
+        device = TuyaBLEDevice(manager, ble_device)
         await device.initialize()
         device.register_callback(self._on_datapoints)
         self._device = device

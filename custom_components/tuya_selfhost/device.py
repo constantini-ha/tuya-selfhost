@@ -832,25 +832,11 @@ class TuyaLocalDevice(object):
         return keys[values.index(value)] if value in values else fallback
 
 
-def _ble_transport(hass, dev_id, local_key, ble: dict):
-    """Build the Bluetooth transport from what the config entry stored."""
-    from .ble.manager import TuyaBLEDeviceCredentials
+def _ble_transport(hass, dev_id, local_key, address: str):
+    """Build the Bluetooth transport; the uuid comes off the air at connect time."""
     from .ble.transport import TuyaBleTransport
 
-    return TuyaBleTransport(
-        hass,
-        ble["address"],
-        TuyaBLEDeviceCredentials(
-            uuid=ble["uuid"],
-            local_key=local_key,
-            device_id=dev_id,
-            category=ble.get("category", ""),
-            product_id=ble.get("product_id", ""),
-            device_name=ble.get("device_name"),
-            product_model=ble.get("product_model"),
-            product_name=ble.get("product_name"),
-        ),
-    )
+    return TuyaBleTransport(hass, address, dev_id, local_key)
 
 
 def setup_device(hass: HomeAssistant, config: dict):

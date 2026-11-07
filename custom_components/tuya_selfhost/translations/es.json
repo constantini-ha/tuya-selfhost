@@ -76,21 +76,13 @@
                     "poll_only": "Solo encuesta (pruebe esto si su dispositivo no funciona completamente)",
                     "device_cid": "Sub device node_id o uuid (para dispositivos conectados a través de una puerta de enlace)"
                 }
-            },
-            "ble": {
-                "title": "Dispositivo Bluetooth",
-                "description": "Elige cómo se ve **{device_name}** por Bluetooth. Solo se listan los que están en alcance.",
-                "data": {
-                    "address": "Qué dispositivo"
-                }
             }
         },
         "abort": {
             "already_configured": "Ya se ha agregado un dispositivo con esa ID.",
             "not_supported": "Lo sentimos, no hay soporte para este dispositivo.",
             "no_devices": "No se puede encontrar ningún dispositivo no registrado para la cuenta.",
-            "reconfigure_successful": "Dispositivo sustituido. Se conservaron las entidades y los códigos aprendidos.",
-            "no_ble_devices": "Ningún dispositivo Tuya está anunciando por Bluetooth ahora. Acerca uno e inténtalo de nuevo."
+            "reconfigure_successful": "Dispositivo sustituido. Se conservaron las entidades y los códigos aprendidos."
         },
         "error": {
             "connection": "No se puede conectar a su dispositivo con esos detalles. Podría ser un problema intermitente, o pueden ser incorrectos. Si seleccionó una versión de protocolo específica, pruebe 'auto' en su lugar.",
@@ -103,8 +95,7 @@
             "options": {
                 "cloud": "Configuración del dispositivo asistida por la nube SmartLife.",
                 "manual": "Proporcione manualmente información de conexión del dispositivo.",
-                "cloud_fresh_login": "Configuración del dispositivo asistida por la nube SmartLife con inicio de sesión fresco.",
-                "bluetooth": "Bluetooth"
+                "cloud_fresh_login": "Configuración del dispositivo asistida por la nube SmartLife con inicio de sesión fresco."
             }
         }
     },
@@ -117,7 +108,8 @@
                     "host": "Dirección IP o nombre de host",
                     "local_key": "Clave local (Local key)",
                     "protocol_version": "Versión del protocolo (pruebe automático si no lo sabe)",
-                    "poll_only": "Solo encuesta (pruebe esto si su dispositivo no funciona completamente)"
+                    "poll_only": "Solo encuesta (pruebe esto si su dispositivo no funciona completamente)",
+                    "ble": "Dirección Bluetooth (vacío = usar Wi-Fi)"
                 }
             }
         },

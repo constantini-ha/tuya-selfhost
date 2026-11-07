@@ -76,21 +76,13 @@
                     "poll_only": "Poll only (try this if your device does not work fully)",
                     "device_cid": "Sub device node_id or uuid (for devices connected via gateway)"
                 }
-            },
-            "ble": {
-                "title": "Bluetooth device",
-                "description": "Pick the Tuya device **{device_name}** is seen as over Bluetooth. Only devices in range are listed.",
-                "data": {
-                    "address": "Which device"
-                }
             }
         },
         "abort": {
             "already_configured": "A device with that ID has already been added.",
             "not_supported": "Sorry, there is no support for this device.",
             "no_devices": "Unable to find any unregistered devices for the account.",
-            "reconfigure_successful": "Device replaced. Entities and learned codes were kept.",
-            "no_ble_devices": "No Tuya device is advertising over Bluetooth right now. Bring one closer and try again."
+            "reconfigure_successful": "Device replaced. Entities and learned codes were kept."
         },
         "error": {
             "connection": "Unable to connect to your device with those details. It could be an intermittent issue, or they may be incorrect. If you selected a specific protocol version, try 'auto' instead.",
@@ -103,8 +95,7 @@
             "options": {
                 "cloud": "SmartLife cloud-assisted device setup.",
                 "manual": "Manually provide device connection information.",
-                "cloud_fresh_login": "SmartLife cloud-assisted device setup with fresh login.",
-                "bluetooth": "Bluetooth"
+                "cloud_fresh_login": "SmartLife cloud-assisted device setup with fresh login."
             }
         }
     },
@@ -117,7 +108,8 @@
                     "host": "IP address or hostname",
                     "local_key": "Local key",
                     "protocol_version": "Protocol version (try auto if not known)",
-                    "poll_only": "Poll only (try this if your device does not work fully)"
+                    "poll_only": "Poll only (try this if your device does not work fully)",
+                    "ble": "Bluetooth address (leave empty for Wi-Fi)"
                 }
             }
         },

@@ -400,8 +400,10 @@ class TuyaBLEDevice:
                     match service_data[0]:
                         case 0:
                             raw_product_id = service_data[1:]
-                        # case 1:
-                        #    raw_product_key = service_data[1:]
+                        case 1:
+                            # Some modules advertise the product key instead;
+                            # it keys the uuid cipher exactly the same way.
+                            raw_product_id = service_data[1:]
 
             if self._advertisement_data.manufacturer_data:
                 manufacturer_data = self._advertisement_data.manufacturer_data.get(

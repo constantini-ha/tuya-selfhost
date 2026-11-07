@@ -26,8 +26,6 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
-from homeassistant.components import bluetooth
-
 from . import DOMAIN
 from .cloud import Cloud
 from .const import (
@@ -168,19 +166,12 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_cloud()
             if mode == "manual":
                 return await self.async_step_local()
-            if mode == "bluetooth":
-                self._ble_mode = True
-                self.init_cloud()
-                if self.cloud.is_authenticated:
-                    self.__cloud_devices = await self.cloud.async_get_devices()
-                    return await self.async_step_choose_device()
-                return await self.async_step_cloud()
 
         # Build form
         fields: OrderedDict[vol.Marker, Any] = OrderedDict()
         fields[vol.Required("setup_mode")] = SelectSelector(
             SelectSelectorConfig(
-                options=["cloud", "manual", "bluetooth", "cloud_fresh_login"],
+                options=["cloud", "manual", "cloud_fresh_login"],
                 mode=SelectSelectorMode.LIST,
                 translation_key="setup_mode",
             )
@@ -383,8 +374,6 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         return ""
 
     async def async_step_search(self, user_input=None):
-        if getattr(self, "_ble_mode", False):
-            return await self.async_step_ble()
         if user_input is not None:
             # Current IP is the WAN IP which is of no use. Need to try and discover to the local IP.
             # This scan will take 18s with the default settings. If we cannot find the device we
@@ -567,68 +556,6 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_ble(self, user_input=None):
-        """Pair the chosen cloud device with a Tuya blaster seen over Bluetooth."""
-        errors = {}
-        nearby = [
-            info
-            for info in bluetooth.async_discovered_service_info(
-                self.hass, connectable=True
-            )
-            if TUYA_BLE_SERVICE in (info.service_uuids or [])
-            or TUYA_BLE_SERVICE in (info.service_data or {})
-        ]
-
-        if not nearby:
-            return self.async_abort(reason="no_ble_devices")
-
-        if user_input is not None:
-            cloud = self.__cloud_device or {}
-            self.data = {
-                CONF_DEVICE_ID: cloud.get("id"),
-                CONF_HOST: "",
-                CONF_LOCAL_KEY: cloud.get(CONF_LOCAL_KEY),
-                CONF_PROTOCOL_VERSION: 3.3,
-                CONF_POLL_ONLY: False,
-                CONF_BLE: {
-                    "address": user_input["address"],
-                    "uuid": cloud.get("uuid"),
-                    "category": cloud.get("category", ""),
-                    "product_id": cloud.get("product_id", ""),
-                    "device_name": cloud.get("name"),
-                },
-            }
-            self.device = await async_test_connection(self.data, self.hass)
-            if self.device:
-                await self.async_set_unique_id(self.data[CONF_DEVICE_ID])
-                self._abort_if_unique_id_configured()
-                return await self.async_step_select_type()
-            errors["base"] = "connection"
-
-        options = [
-            SelectOptionDict(
-                value=info.address,
-                label=f"{info.name or info.address} ({info.address}, {info.rssi} dBm)",
-            )
-            for info in sorted(nearby, key=lambda i: -(i.rssi or -999))
-        ]
-        return self.async_show_form(
-            step_id="ble",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("address"): SelectSelector(
-                        SelectSelectorConfig(
-                            options=options, mode=SelectSelectorMode.LIST
-                        )
-                    )
-                }
-            ),
-            description_placeholders={
-                "device_name": self._device_name_placeholder,
-            },
-            errors=errors,
-        )
-
     async def async_step_select_type(self, user_input=None):
         if user_input is not None:
             # Value is a compound key: "config_type||manufacturer||model"
@@ -807,6 +734,9 @@ class OptionsFlowHandler(OptionsFlow):
             vol.Required(
                 CONF_POLL_ONLY, default=config.get(CONF_POLL_ONLY, False)
             ): bool,
+            vol.Optional(
+                CONF_BLE, default=config.get(CONF_BLE, "")
+            ): str,
         }
         cfg = await self.hass.async_add_executor_job(
             get_config,
