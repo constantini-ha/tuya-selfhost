@@ -14,6 +14,8 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_HOST, CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.selector import (
     QrCodeSelector,
     QrCodeSelectorConfig,
@@ -50,6 +52,46 @@ DEVICE_DETAILS_URL = (
     "https://github.com/make-all/tuya-local/blob/main/DEVICE_DETAILS.md"
     "#finding-your-device-id-and-local-key"
 )
+
+
+async def _async_migrate_identity(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    old_uid: str,
+    new_uid: str,
+) -> None:
+    """Carry entity ids, the device entry and learned codes to a replacement device."""
+    from .remote import CODE_STORAGE_VERSION, FLAG_STORAGE_VERSION
+
+    ent_reg = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+        if old_uid in entity.unique_id:
+            ent_reg.async_update_entity(
+                entity.entity_id,
+                new_unique_id=entity.unique_id.replace(old_uid, new_uid),
+            )
+
+    dev_reg = dr.async_get(hass)
+    device = dev_reg.async_get_device(identifiers={(DOMAIN, old_uid)})
+    if device:
+        dev_reg.async_update_device(device.id, new_identifiers={(DOMAIN, new_uid)})
+
+    for version, suffix in (
+        (CODE_STORAGE_VERSION, "codes"),
+        (FLAG_STORAGE_VERSION, "flags"),
+    ):
+        source = Store(hass, version, f"tuya_selfhost_remote_{old_uid}_{suffix}")
+        stored = await source.async_load()
+        if stored is None:
+            continue
+        target = Store(hass, version, f"tuya_selfhost_remote_{new_uid}_{suffix}")
+        await target.async_save(stored)
+        await source.async_remove()
+
+    _LOGGER.info(
+        "Migrated %s to its replacement device, keeping entities and learned codes",
+        entry.title,
+    )
 
 
 class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -450,6 +492,64 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "device_details_url": DEVICE_DETAILS_URL,
                 "device_name": self._device_name_placeholder,
+            },
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Point an existing entry at a replacement device."""
+        entry = self._get_reconfigure_entry()
+        config = {**entry.data, **entry.options}
+        defaults = {**config, **(user_input or {})}
+        errors = {}
+
+        if user_input is not None:
+            proto = user_input.get(CONF_PROTOCOL_VERSION)
+            if proto != "auto":
+                user_input[CONF_PROTOCOL_VERSION] = float(proto)
+            if not user_input.get(CONF_DEVICE_CID):
+                user_input.pop(CONF_DEVICE_CID, None)
+            candidate = {**config, **user_input}
+            if await async_test_connection(candidate, self.hass):
+                old_uid = get_device_id(config)
+                new_uid = get_device_id(candidate)
+                if old_uid != new_uid:
+                    await self.async_set_unique_id(new_uid)
+                    self._abort_if_unique_id_configured()
+                    await _async_migrate_identity(self.hass, entry, old_uid, new_uid)
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates=user_input,
+                    unique_id=new_uid,
+                )
+            errors["base"] = "connection"
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_DEVICE_ID, default=defaults.get(CONF_DEVICE_ID, "")
+                    ): str,
+                    vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, "")): str,
+                    vol.Required(
+                        CONF_LOCAL_KEY, default=defaults.get(CONF_LOCAL_KEY, "")
+                    ): str,
+                    vol.Required(
+                        CONF_PROTOCOL_VERSION,
+                        default=str(defaults.get(CONF_PROTOCOL_VERSION, "auto")),
+                    ): vol.In(["auto"] + [str(v) for v in API_PROTOCOL_VERSIONS]),
+                    vol.Required(
+                        CONF_POLL_ONLY, default=defaults.get(CONF_POLL_ONLY, False)
+                    ): bool,
+                    vol.Optional(
+                        CONF_DEVICE_CID, default=defaults.get(CONF_DEVICE_CID, "")
+                    ): str,
+                }
+            ),
+            description_placeholders={
+                "device_details_url": DEVICE_DETAILS_URL,
+                "device_name": entry.title,
             },
             errors=errors,
         )

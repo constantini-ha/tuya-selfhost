@@ -64,12 +64,25 @@
                 "data": {
                     "name": "Nombre"
                 }
+            },
+            "reconfigure": {
+                "title": "Sustituir dispositivo",
+                "description": "Apunta **{device_name}** a un dispositivo de repuesto. Se conservan los IDs de entidad, el historial, el área y los códigos aprendidos del mando. [Dónde encontrar el device id y la local key]({device_details_url})",
+                "data": {
+                    "host": "Dirección IP o nombre de host",
+                    "device_id": "Identificación del dispositivo (device_id, o device_id de la puerta de enlace para dispositivos conectados a través de una puerta de enlace)",
+                    "local_key": "Clave local (Local key)",
+                    "protocol_version": "Versión del protocolo (pruebe automático si no lo sabe)",
+                    "poll_only": "Solo encuesta (pruebe esto si su dispositivo no funciona completamente)",
+                    "device_cid": "Sub device node_id o uuid (para dispositivos conectados a través de una puerta de enlace)"
+                }
             }
         },
         "abort": {
             "already_configured": "Ya se ha agregado un dispositivo con esa ID.",
             "not_supported": "Lo sentimos, no hay soporte para este dispositivo.",
-            "no_devices": "No se puede encontrar ningún dispositivo no registrado para la cuenta."
+            "no_devices": "No se puede encontrar ningún dispositivo no registrado para la cuenta.",
+            "reconfigure_successful": "Dispositivo sustituido. Se conservaron las entidades y los códigos aprendidos."
         },
         "error": {
             "connection": "No se puede conectar a su dispositivo con esos detalles. Podría ser un problema intermitente, o pueden ser incorrectos. Si seleccionó una versión de protocolo específica, pruebe 'auto' en su lugar.",
