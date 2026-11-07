@@ -143,6 +143,15 @@ no Nabu Casa subscription. The **Alexa configuration** action builds the whole
 See [ALEXA.md](ALEXA.md) — also in [português](ALEXA.pt-BR.md) and
 [español](ALEXA.es.md).
 
+## IR and RF blasters without a matching protocol
+
+When no protocol integration speaks your appliance's dialect, teach the blaster
+your physical remote and replay the codes. Works with any brand, and the learned
+codes survive a device swap.
+
+See [LEARNED_REMOTES.md](LEARNED_REMOTES.md) — also in
+[português](LEARNED_REMOTES.pt-BR.md) and [español](LEARNED_REMOTES.es.md).
+
 ## Device support
 
 A list of currently supported devices can be found in the [DEVICES.md](https://github.com/make-all/tuya-local/blob/main/DEVICES.md) file.
