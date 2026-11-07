@@ -64,12 +64,25 @@
                 "data": {
                     "name": "Name"
                 }
+            },
+            "reconfigure": {
+                "title": "Replace device",
+                "description": "Point **{device_name}** at a replacement device. Entity IDs, history, area and learned remote codes are kept. [Where to find the device id and local key]({device_details_url})",
+                "data": {
+                    "host": "IP address or hostname",
+                    "device_id": "Device ID (or the hub's Device ID for devices connected via gateway)",
+                    "local_key": "Local key",
+                    "protocol_version": "Protocol version (try auto if not known)",
+                    "poll_only": "Poll only (try this if your device does not work fully)",
+                    "device_cid": "Sub device node_id or uuid (for devices connected via gateway)"
+                }
             }
         },
         "abort": {
             "already_configured": "A device with that ID has already been added.",
             "not_supported": "Sorry, there is no support for this device.",
-            "no_devices": "Unable to find any unregistered devices for the account."
+            "no_devices": "Unable to find any unregistered devices for the account.",
+            "reconfigure_successful": "Device replaced. Entities and learned codes were kept."
         },
         "error": {
             "connection": "Unable to connect to your device with those details. It could be an intermittent issue, or they may be incorrect. If you selected a specific protocol version, try 'auto' instead.",
@@ -124,6 +137,10 @@
                     "description": "The IR device to send the command to. This is optional and only needed if the command was saved with a device."
                 }
             }
+        },
+        "network_report": {
+            "name": "Network report",
+            "description": "Lists the configured devices with their IP and MAC so you can block the ones that no longer need the Internet at your router."
         }
     },
     "entity": {
