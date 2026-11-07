@@ -90,6 +90,7 @@ class TuyaLocalDevice(object):
         self._startup_listener = None
         self._api_protocol_version_index = None
         self._api_protocol_working = False
+        self._api_standby = None
         self._api_working_protocol_failures = 0
         self.dev_cid = dev_cid
         try:
@@ -119,12 +120,16 @@ class TuyaLocalDevice(object):
                     self._api_lock = hass.data[DOMAIN][dev_id].get(
                         "tuyadevicelock", asyncio.Lock()
                     )
-                elif ble:
+                elif ble and not address:
                     self._api = _ble_transport(hass, dev_id, local_key, ble)
                     self._api_lock = asyncio.Lock()
                 else:
                     self._api = tinytuya.Device(dev_id, address, local_key)
                     self._api_lock = asyncio.Lock()
+                    if ble:
+                        self._api_standby = _ble_transport(
+                            hass, dev_id, local_key, ble
+                        )
                     if name != "Test":
                         hass.data[DOMAIN][dev_id] = {
                             "tuyadevice": self._api,
@@ -519,6 +524,23 @@ class TuyaLocalDevice(object):
             log_json(cached_state),
         )
 
+    def _switch_transport(self):
+        """Fall back to the other way of reaching this device, if there is one.
+
+        Swapping both ways means a device that came back on Wi-Fi returns to it
+        on the next failed round, so neither transport is ever stuck.
+        """
+        if self._api_standby is None:
+            return
+        self._api, self._api_standby = self._api_standby, self._api
+        self._api_protocol_working = False
+        self._api_protocol_version_index = None
+        _LOGGER.warning(
+            "%s unreachable; trying it over %s instead",
+            self.name,
+            "Bluetooth" if hasattr(self._api, "_address") else "Wi-Fi",
+        )
+
     async def async_refresh(self):
         _LOGGER.debug("Refreshing device state for %s", self.name)
         if not self._running:
@@ -713,6 +735,7 @@ class TuyaLocalDevice(object):
 
                 if i + 1 == connections:
                     self._reset_cached_state()
+                    self._switch_transport()
                     self._api_working_protocol_failures += 1
                     if (
                         self._api_working_protocol_failures

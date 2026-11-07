@@ -109,7 +109,7 @@
                     "local_key": "Chave Local",
                     "protocol_version": "Versão do protocolo (tente auto se não souber)",
                     "poll_only": "Pesquisar (tente isto se o seu dispositivo não funcionar totalmente)",
-                    "ble": "Endereço Bluetooth (vazio = usar Wi-Fi)"
+                    "ble": "Endereço Bluetooth (usado quando o Wi-Fi parar de responder)"
                 }
             }
         },

@@ -109,7 +109,7 @@
                     "local_key": "Clave local (Local key)",
                     "protocol_version": "Versión del protocolo (pruebe automático si no lo sabe)",
                     "poll_only": "Solo encuesta (pruebe esto si su dispositivo no funciona completamente)",
-                    "ble": "Dirección Bluetooth (vacío = usar Wi-Fi)"
+                    "ble": "Dirección Bluetooth (se usa cuando el Wi-Fi deja de responder)"
                 }
             }
         },
