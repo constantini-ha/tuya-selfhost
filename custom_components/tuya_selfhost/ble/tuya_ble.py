@@ -36,7 +36,7 @@ from .const import (
     TuyaBLEDataPointType,
 )
 
-from ..const import (
+from .const import (
     DPCode,
     DPType,
 )
