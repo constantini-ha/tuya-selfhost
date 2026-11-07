@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from functools import partial
 
 import voluptuous as vol
 from homeassistant.components import infrared
@@ -10,11 +11,12 @@ from homeassistant.components.remote import (
     DEFAULT_DELAY_SECS,
 )
 from homeassistant.components.remote import DOMAIN as REMOTE_DOMAIN
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.const import CONF_HOST
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import service
 
-from .const import DOMAIN
+from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .infrared import TuyaRemoteCommand
 from .remote import FLAG_SAVE_DELAY, TuyaLocalRemote
 
@@ -38,7 +40,74 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
             schema=REMOTE_SEND_IR_COMMAND_SCHEMA,
             func=async_handle_send_ir_command,
         )
+    hass.services.async_register(
+        DOMAIN,
+        "network_report",
+        partial(async_handle_network_report, hass),
+        schema=vol.Schema({}),
+        supports_response=SupportsResponse.ONLY,
+    )
     return True
+
+
+def _read_arp_table() -> dict[str, str]:
+    """Map IP to MAC from the kernel ARP cache."""
+    table: dict[str, str] = {}
+    try:
+        with open("/proc/net/arp") as handle:
+            next(handle, None)
+            for line in handle:
+                fields = line.split()
+                if len(fields) >= 4 and fields[3] != "00:00:00:00:00:00":
+                    table[fields[0]] = fields[3].upper()
+    except OSError:
+        _LOGGER.debug("ARP table unavailable")
+    return table
+
+
+def _host_sort_key(device: dict) -> list[int]:
+    """Sort by IP, pushing anything unparseable to the end."""
+    parts = device["host"].split(".")
+    if len(parts) == 4 and all(p.isdigit() for p in parts):
+        return [int(p) for p in parts]
+    return [999, 999, 999, 999]
+
+
+async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
+    """List configured devices with their MAC, flagging which are safe to block."""
+    arp = await hass.async_add_executor_job(_read_arp_table)
+    entries = hass.config_entries.async_entries(DOMAIN)
+    gateways = {
+        entry.data.get(CONF_DEVICE_ID)
+        for entry in entries
+        if entry.data.get(CONF_DEVICE_CID)
+    }
+
+    devices = []
+    for entry in entries:
+        config = {**entry.data, **entry.options}
+        host = config.get(CONF_HOST) or ""
+        mac = arp.get(host)
+        if config.get(CONF_DEVICE_CID):
+            role, note = "sub-device", "reached through its gateway"
+        elif config.get(CONF_DEVICE_ID) in gateways:
+            role, note = "gateway", "other devices depend on it, and it needs the cloud"
+        else:
+            role, note = "device", "controlled locally"
+        devices.append(
+            {
+                "name": entry.title,
+                "host": host,
+                "mac": mac,
+                "on_lan": mac is not None,
+                "role": role,
+                "block_recommended": role == "device",
+                "note": note,
+            }
+        )
+
+    devices.sort(key=_host_sort_key)
+    return {"devices": devices}
 
 
 async def async_handle_send_ir_command(entity, call: ServiceCall):

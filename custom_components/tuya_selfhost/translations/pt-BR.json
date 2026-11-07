@@ -137,6 +137,10 @@
                     "description": "O dispositivo IR para o qual enviar o comando. Isso é opcional e só é necessário se o comando foi salvo com um dispositivo."
                 }
             }
+        },
+        "network_report": {
+            "name": "Relatório de rede",
+            "description": "Lista os aparelhos configurados com IP e MAC para você bloquear no roteador os que não precisam mais de internet."
         }
     },
     "entity": {

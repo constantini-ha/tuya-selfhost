@@ -137,6 +137,10 @@
                     "description": "The IR device to send the command to. This is optional and only needed if the command was saved with a device."
                 }
             }
+        },
+        "network_report": {
+            "name": "Network report",
+            "description": "Lists the configured devices with their IP and MAC so you can block the ones that no longer need the Internet at your router."
         }
     },
     "entity": {
