@@ -18,6 +18,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 
 from .const import (
+    CONF_BLE,
     API_PROTOCOL_VERSIONS,
     CONF_DEVICE_CID,
     CONF_DEVICE_ID,
@@ -61,6 +62,7 @@ class TuyaLocalDevice(object):
         poll_only=False,
         manufacturer=None,
         model=None,
+        ble=None,
     ):
         """
         Represents a Tuya-based device.
@@ -117,6 +119,9 @@ class TuyaLocalDevice(object):
                     self._api_lock = hass.data[DOMAIN][dev_id].get(
                         "tuyadevicelock", asyncio.Lock()
                     )
+                elif ble:
+                    self._api = _ble_transport(hass, dev_id, local_key, ble)
+                    self._api_lock = asyncio.Lock()
                 else:
                     self._api = tinytuya.Device(dev_id, address, local_key)
                     self._api_lock = asyncio.Lock()
@@ -827,6 +832,27 @@ class TuyaLocalDevice(object):
         return keys[values.index(value)] if value in values else fallback
 
 
+def _ble_transport(hass, dev_id, local_key, ble: dict):
+    """Build the Bluetooth transport from what the config entry stored."""
+    from .ble.manager import TuyaBLEDeviceCredentials
+    from .ble.transport import TuyaBleTransport
+
+    return TuyaBleTransport(
+        hass,
+        ble["address"],
+        TuyaBLEDeviceCredentials(
+            uuid=ble["uuid"],
+            local_key=local_key,
+            device_id=dev_id,
+            category=ble.get("category", ""),
+            product_id=ble.get("product_id", ""),
+            device_name=ble.get("device_name"),
+            product_model=ble.get("product_model"),
+            product_name=ble.get("product_name"),
+        ),
+    )
+
+
 def setup_device(hass: HomeAssistant, config: dict):
     """Setup a tuya device based on passed in config."""
 
@@ -843,6 +869,7 @@ def setup_device(hass: HomeAssistant, config: dict):
         config[CONF_POLL_ONLY],
         manufacturer=config.get(CONF_MANUFACTURER),
         model=config.get(CONF_MODEL),
+        ble=config.get(CONF_BLE),
     )
     hass.data[DOMAIN][get_device_id(config)] = {
         "device": device,

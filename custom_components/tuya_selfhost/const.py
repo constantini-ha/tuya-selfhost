@@ -27,3 +27,5 @@ TUYA_RESPONSE_MSG = "msg"
 TUYA_RESPONSE_QR_CODE = "qrcode"
 TUYA_RESPONSE_RESULT = "result"
 TUYA_RESPONSE_SUCCESS = "success"
+
+CONF_BLE = "ble"
