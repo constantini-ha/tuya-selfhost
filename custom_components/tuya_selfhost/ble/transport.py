@@ -20,6 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CALL_TIMEOUT = 30
 RECEIVE_TIMEOUT = 5
+STATUS_SETTLE_STEPS = 20
 
 # A Tuya module accepts one GATT session at a time, and the packet counter
 # belongs to that session, so every transport for an address shares one.
@@ -141,8 +142,16 @@ class TuyaBleTransport:
 
     def status(self) -> dict[str, Any]:
         device = self._run(self._async_device())
-        self._run(device.update())
+        self._run(self._async_status(device))
         return {"dps": self._as_dps(device)}
+
+    async def _async_status(self, device: TuyaBLEDevice) -> None:
+        """Ask for the state and give the datapoint notifications time to land."""
+        await device.update()
+        for _ in range(STATUS_SETTLE_STEPS):
+            if len(device.datapoints):
+                return
+            await asyncio.sleep(0.25)
 
     def updatedps(self, dps=None) -> dict[str, Any]:
         return self.status()
@@ -155,8 +164,8 @@ class TuyaBleTransport:
             return None
 
     def heartbeat(self, nowait: bool = True):
-        device = self._run(self._async_device())
-        return {"connected": device.is_connected}
+        self._run(self._async_device())
+        return None
 
     def set_dps(self, value, dp_index, nowait: bool = False):
         return self.set_multiple_values({dp_index: value}, nowait=nowait)
