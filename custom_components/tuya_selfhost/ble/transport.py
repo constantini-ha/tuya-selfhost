@@ -78,6 +78,8 @@ class TuyaBleTransport:
             device_name=None,
             product_model=None,
             product_name=None,
+            functions=None,
+            status_range=None,
         )
 
     # ------------------------------------------------------------------
