@@ -49,8 +49,8 @@ async def async_setup_remote_card(hass: HomeAssistant) -> None:
         webcomponent_name="tuya-selfhost-panel",
         frontend_url_path=PANEL_URL_PATH,
         module_url=f"{FRONTEND_URL}/{PANEL_FILE}?v={integration.version}",
-        sidebar_title="Controles Tuya",
-        sidebar_icon="mdi:remote",
+        sidebar_title="Tuya Selfhost",
+        sidebar_icon="mdi:home-automation",
         require_admin=True,
         embed_iframe=False,
     )
