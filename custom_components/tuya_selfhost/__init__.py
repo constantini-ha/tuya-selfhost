@@ -1043,6 +1043,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Give Bluetooth discovery a moment to populate, then look for this
     # device's radio; repeat, because what is in range changes.
+    @callback
     def _look_for_radio(_now=None):
         entry.async_create_task(hass, async_detect_reserve(hass, entry))
 
