@@ -325,14 +325,15 @@ class TuyaSelfhostPanel extends HTMLElement {
           }</div>
         </div>
         ${remote ? '<span class="pill on">emissor IR/RF</span>' : ""}`;
-      const open = document.createElement("button");
-      open.className = "act";
-      open.textContent = "Abrir";
-      open.addEventListener("click", () => {
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => {
         this._open = entry.entry_id;
         this._render();
       });
-      row.appendChild(open);
+      row.insertAdjacentHTML(
+        "beforeend",
+        '<ha-icon icon="mdi:chevron-right" style="--mdc-icon-size:22px;opacity:.5"></ha-icon>'
+      );
       card.appendChild(row);
     }
     return card;
@@ -389,6 +390,12 @@ class TuyaSelfhostPanel extends HTMLElement {
         row.innerHTML = `<ha-icon icon="mdi:remote-tv"></ha-icon>
           <div class="grow"><div>${control.name}</div>
           <div class="muted">${control.buttons.length} botões · ${taught} aprendidos</div></div>`;
+        row.style.cursor = "pointer";
+        row.addEventListener("click", (ev) => {
+          if (ev.target.closest("button")) return;
+          this._remote = control.id;
+          this._render();
+        });
         const open = document.createElement("button");
         open.className = "act";
         open.textContent = "Abrir";
