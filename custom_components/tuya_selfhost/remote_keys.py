@@ -9,9 +9,11 @@ it.
 import logging
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import slugify
@@ -23,13 +25,18 @@ from .remote_card import SIGNAL_LAYOUTS, STORAGE_KEY
 _LOGGER = logging.getLogger(__name__)
 
 OBJECT_ID_PREFIX = "tuya_remote"
+MODEL = "Learned remote"
 ALEXA_ENDPOINT = "/api/alexa/smart_home"
 
 
 async def async_setup_remote_keys(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities, kind: str
 ) -> None:
-    """Keep one button per taught key, following what the panel saves."""
+    """Keep the entities of one domain in step with what the panel saves.
+
+    `kind` is "button" for the single keys and "switch" for a power pair; each
+    platform owns its own adder, so they cannot share one pass.
+    """
     config = {**entry.data, **entry.options}
     device = hass.data[DOMAIN][get_device_id(config)]["device"]
     known: set[str] = set()
@@ -47,11 +54,27 @@ async def async_setup_remote_keys(
         store = hass.data.get(STORAGE_KEY)
         stored = await store.async_load() or {}
 
-        wanted: dict[str, ButtonEntity] = {}
+        wanted: dict[str, ButtonEntity | SwitchEntity] = {}
         for remote_id in remotes:
             for control in (stored.get(remote_id) or {}).get("controls", []):
+                power = control.get("power") or {}
+                by_command = {k["command"]: k for k in control.get("buttons", [])}
+                paired = {
+                    c
+                    for c in (power.get("on"), power.get("off"))
+                    if c and by_command.get(c, {}).get("taught")
+                }
+                if kind == "switch":
+                    if paired:
+                        switch = RemotePowerSwitch(entry, device, remote_id, control, power)
+                        wanted[switch.unique_id] = switch
+                    continue
                 for key in control.get("buttons", []):
                     if not key.get("taught"):
+                        continue
+                    # A paired key already answers through the switch; a second
+                    # entity for it would only show up twice in every assistant.
+                    if key["command"] in paired:
                         continue
                     button = RemoteKeyButton(entry, device, remote_id, control, key)
                     wanted[button.unique_id] = button
@@ -64,7 +87,7 @@ async def async_setup_remote_keys(
 
         gone = []
         for uid in known - set(wanted):
-            entity_id = registry.async_get_entity_id("button", DOMAIN, uid)
+            entity_id = registry.async_get_entity_id(kind, DOMAIN, uid)
             if entity_id:
                 registry.async_remove(entity_id)
                 gone.append(entity_id)
@@ -84,7 +107,7 @@ async def async_setup_remote_keys(
 class RemoteKeyButton(ButtonEntity):
     """One learned key, pressable by voice, automation or dashboard."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
     _attr_should_poll = False
 
     def __init__(self, entry: ConfigEntry, device, remote_id: str, control, key):
@@ -92,12 +115,14 @@ class RemoteKeyButton(ButtonEntity):
         self._device_name = control.get("device")
         self._command = key["command"]
         self._attr_unique_id = f"{entry.entry_id}:{control['id']}:{key['command']}"
-        self._attr_name = f"{control['name']} {key['name']}".strip()
+        self._attr_name = key["name"]
         self._attr_icon = key.get("icon") or "mdi:remote"
-        self._attr_device_info = device.device_info
+        self._attr_device_info = _control_device(entry, device, control)
         # Set outright rather than suggested: Home Assistant prefixes a suggestion
         # with the area and the device, and the Alexa filter needs one stable glob.
-        self.entity_id = f"button.{slugify(f'{OBJECT_ID_PREFIX} {self._attr_name}')}"
+        self.entity_id = "button." + slugify(
+            f"{OBJECT_ID_PREFIX} {control['name']} {key['name']}"
+        )
 
     async def async_press(self) -> None:
         await self.hass.services.async_call(
@@ -141,6 +166,55 @@ def _alexa_config(hass: HomeAssistant):
             if config is not None:
                 return config
     return None
+
+
+class RemotePowerSwitch(SwitchEntity):
+    """An on/off key pair, so assistants see a device instead of two scenes.
+
+    Infrared is one way: the state here is what we last sent, not what the
+    appliance is doing. `assumed_state` says so, and Home Assistant draws the
+    two buttons rather than a toggle because of it.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = None  # the control's own name, with nothing appended
+    _attr_should_poll = False
+    _attr_assumed_state = True
+
+    def __init__(self, entry: ConfigEntry, device, remote_id: str, control, power):
+        self._remote_id = remote_id
+        self._device_name = control.get("device")
+        self._on = power.get("on")
+        self._off = power.get("off")
+        self._attr_unique_id = f"{entry.entry_id}:{control['id']}:power"
+        self._attr_icon = "mdi:power"
+        self._attr_device_info = _control_device(entry, device, control)
+        self._attr_is_on = False
+        self.entity_id = "switch." + slugify(f"{OBJECT_ID_PREFIX} {control['name']}")
+
+    async def _press(self, command: str | None) -> None:
+        if command is None:
+            return
+        await self.hass.services.async_call(
+            "remote",
+            "send_command",
+            {
+                "entity_id": self._remote_id,
+                "device": self._device_name,
+                "command": command,
+            },
+            blocking=True,
+        )
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self._press(self._on)
+        self._attr_is_on = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self._press(self._off)
+        self._attr_is_on = False
+        self.async_write_ha_state()
 
 
 async def _async_tell_alexa(hass: HomeAssistant, entity_ids: list[str], *, gone: bool) -> bool:
@@ -189,3 +263,20 @@ async def async_announce_to_alexa(hass: HomeAssistant, entity_ids: list[str]) ->
 async def async_forget_in_alexa(hass: HomeAssistant, entity_ids: list[str]) -> bool:
     """Drop deleted keys from Alexa, so no dead scene is left behind."""
     return await _async_tell_alexa(hass, entity_ids, gone=True)
+
+
+def _control_device(entry: ConfigEntry, emitter, control) -> DeviceInfo:
+    """One device per control, named as the user named it.
+
+    A blaster holds several remotes — a TV, an air conditioner, a fan — so the
+    emitter's name is the wrong one to carry: Home Assistant prefixes an
+    entity's name with its device's, and "<blaster> <remote> <key>" is not
+    something anyone can say out loud.
+    """
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry.entry_id}:{control['id']}")},
+        name=control["name"],
+        manufacturer="Tuya Selfhost",
+        model=MODEL,
+        via_device=next(iter(emitter.device_info["identifiers"])),
+    )

@@ -6,23 +6,28 @@ import logging
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 
+from .const import CONF_TYPE
 from .device import TuyaLocalDevice
 from .entity import TuyaLocalEntity
 from .helpers.config import async_tuya_setup_platform
-from .helpers.device_config import TuyaEntityConfig
+from .helpers.device_config import TuyaEntityConfig, get_config
+from .remote_keys import async_setup_remote_keys
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     config = {**config_entry.data, **config_entry.options}
-    await async_tuya_setup_platform(
-        hass,
-        async_add_entities,
-        config,
-        "switch",
-        TuyaLocalSwitch,
-    )
+    device_conf = await hass.async_add_executor_job(get_config, config[CONF_TYPE])
+    if device_conf and any(e.entity == "switch" for e in device_conf.all_entities()):
+        await async_tuya_setup_platform(
+            hass,
+            async_add_entities,
+            config,
+            "switch",
+            TuyaLocalSwitch,
+        )
+    await async_setup_remote_keys(hass, config_entry, async_add_entities, "switch")
 
 
 class TuyaLocalSwitch(TuyaLocalEntity, SwitchEntity):

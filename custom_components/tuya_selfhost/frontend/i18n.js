@@ -106,6 +106,11 @@ const STRINGS = {
     "keys_sent": "{n} keys sent to Alexa",
     "keys_not_sent": "Alexa did not take them \u2014 say \u201cAlexa, discover devices\u201d",
     "keys_none": "No remote key yet",
+    "power_pair": "Power pair",
+    "power_help": "Pick the key that switches the appliance on and the one that switches it off. The pair becomes a single switch, which Alexa drives as a device \u2014 \u201cturn on\u201d and \u201cturn off\u201d, instead of a scene for each.",
+    "power_none": "\u2014 none \u2014",
+    "power_on": "Turns on",
+    "power_off": "Turns off",
   },
   "pt-BR": {
     devices: "Seus aparelhos",
@@ -211,6 +216,11 @@ const STRINGS = {
     "keys_sent": "{n} teclas enviadas para a Alexa",
     "keys_not_sent": "A Alexa n\u00e3o aceitou \u2014 diga \u201cAlexa, descobrir dispositivos\u201d",
     "keys_none": "Nenhuma tecla de controle ainda",
+    "power_pair": "Par de energia",
+    "power_help": "Escolha a tecla que liga o aparelho e a que desliga. O par vira um \u00fanico switch, que a Alexa trata como dispositivo \u2014 \u201cligar\u201d e \u201cdesligar\u201d, em vez de uma cena para cada.",
+    "power_none": "\u2014 nenhuma \u2014",
+    "power_on": "Liga",
+    "power_off": "Desliga",
   },
   es: {
     devices: "Tus dispositivos",
@@ -316,6 +326,11 @@ const STRINGS = {
     "keys_sent": "{n} teclas enviadas a Alexa",
     "keys_not_sent": "Alexa no las acept\u00f3 \u2014 di \u201cAlexa, detecta dispositivos\u201d",
     "keys_none": "Todav\u00eda no hay ninguna tecla de mando",
+    "power_pair": "Par de encendido",
+    "power_help": "Elige la tecla que enciende el aparato y la que lo apaga. El par se convierte en un solo switch, que Alexa maneja como dispositivo \u2014 \u201cenciende\u201d y \u201capaga\u201d, en vez de una escena para cada uno.",
+    "power_none": "\u2014 ninguna \u2014",
+    "power_on": "Enciende",
+    "power_off": "Apaga",
   },
 };
 

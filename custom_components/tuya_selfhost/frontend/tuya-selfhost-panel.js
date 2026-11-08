@@ -1159,6 +1159,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     card.appendChild(actions);
 
+    if (this._editing) card.appendChild(this._powerPair(control));
+
     if (!this._editing) {
       const hint = document.createElement("div");
       hint.className = "pad muted";
@@ -1195,6 +1197,50 @@ class TuyaSelfhostPanel extends HTMLElement {
     tip.textContent = this._t("hint_edit");
     card.appendChild(tip);
     return card;
+  }
+
+  _powerPair(control) {
+    const box = document.createElement("div");
+    box.className = "pad";
+    box.style.borderTop = "1px solid var(--divider-color)";
+    box.innerHTML = `<div style="font-size:15px;margin-bottom:4px">${this._t("power_pair")}</div>
+      <div class="muted" style="margin-bottom:10px">${this._t("power_help")}</div>`;
+
+    const row = document.createElement("div");
+    row.className = "row";
+    const power = control.power || {};
+    for (const [side, label] of [["on", "power_on"], ["off", "power_off"]]) {
+      const wrap = document.createElement("div");
+      wrap.className = "grow";
+      wrap.innerHTML = `<div class="muted" style="margin-bottom:4px">${this._t(label)}</div>`;
+      const pick = document.createElement("select");
+      pick.style.width = "100%";
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = this._t("power_none");
+      none.selected = !power[side];
+      pick.appendChild(none);
+      for (const key of control.buttons) {
+        const o = document.createElement("option");
+        o.value = key.command;
+        o.textContent = key.name;
+        o.selected = power[side] === key.command;
+        pick.appendChild(o);
+      }
+      pick.addEventListener("change", async () => {
+        const next = { ...(control.power || {}) };
+        if (pick.value) next[side] = pick.value;
+        else delete next[side];
+        if (next.on || next.off) control.power = next;
+        else delete control.power;
+        await this._save(this._remoteOf(this._entry()));
+        this._render();
+      });
+      wrap.appendChild(pick);
+      row.appendChild(wrap);
+    }
+    box.appendChild(row);
+    return box;
   }
 
   _paint(root) {

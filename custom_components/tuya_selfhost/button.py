@@ -27,7 +27,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             "button",
             TuyaLocalButton,
         )
-    await async_setup_remote_keys(hass, config_entry, async_add_entities)
+    await async_setup_remote_keys(hass, config_entry, async_add_entities, "button")
 
 
 class TuyaLocalButton(TuyaLocalEntity, ButtonEntity):

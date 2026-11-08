@@ -163,6 +163,28 @@ key, and no discovery will change that. The generated block gets this right.
 [Exposing your devices to Alexa](ALEXA.md) covers the rest, and
 [Building the Alexa skill from scratch](ALEXA_SKILL.md) covers the skill itself.
 
+### An on/off pair is better than two scenes
+
+A single key is a one-shot, so Alexa can only see it as a scene. A pair — one
+key that switches the appliance on, one that switches it off — is a **device**,
+and that is worth setting up: "turn on the air conditioning" and "turn off the
+air conditioning" both work, which is how anyone expects to talk to an
+appliance.
+
+In **Edit**, under **Power pair**, pick the key that turns it on and the key
+that turns it off. The two stop being scenes and become one switch.
+
+Each remote is a device of its own in Home Assistant, named as you named it and
+listed under the emitter — a blaster holds a television, an air conditioner and
+a fan, and each should answer to its own name. So the switch reads as
+"Living room AC", and a key as "Living room AC Cool 22".
+
+Infrared is one way, so the switch cannot know what the appliance is really
+doing: it shows what was last sent. Home Assistant marks it as an assumed state
+and draws two buttons instead of a toggle.
+
+Everything else stays a scene, which suits a one-shot key like "Cool 22".
+
 ### Naming a key so Alexa understands it
 
 Alexa sees a button as a **scene**, and a scene only answers to *turn on*. There

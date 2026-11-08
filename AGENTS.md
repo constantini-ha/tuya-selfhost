@@ -116,12 +116,14 @@ contradicts your instinct, trust the note.
   keyed by the remote entity id:
   `{controls: [{id, name, device, buttons: [{command, name, icon, taught}]}]}`.
 - Pressing a key calls `remote.send_command` with `device` and `command`.
-- `remote_keys.py` turns every **taught** key into a `button` entity so voice
-  assistants and automations can reach it. It re-syncs on the
-  `tuya_selfhost_layouts_changed` dispatcher signal and once at startup.
+- `remote_keys.py` turns every **taught** key into a `button` entity, and a
+  control's power pair into a `switch`, so voice assistants and automations can
+  reach them. It re-syncs on the `tuya_selfhost_layouts_changed` dispatcher
+  signal and once at startup. An entity adder belongs to one platform, so the
+  pass takes a `kind` and `button.py` and `switch.py` each run their own.
 - Platform forwarding in `__init__.py` is derived from the device config's
-  entity list, so `button` is added explicitly whenever `remote` is present —
-  an emitter has no Tuya buttons of its own. `async_tuya_setup_platform` raises
+  entity list, so `button` and `switch` are added explicitly whenever `remote` is present —
+  an emitter has neither of its own. `async_tuya_setup_platform` raises
   `ValueError` when a platform has no entities, so `button.py` checks the device
   config before calling it.
 
@@ -141,9 +143,12 @@ contradicts your instinct, trust the note.
   `deleted_entities`, and an entity re-added with the same `unique_id` gets its
   old entity_id back. When testing entity naming, change the unique_id or the
   old id will mask the fix.
-- **`friendly_name` carries the device name** once the entity has `device_info`,
-  whatever `has_entity_name` says. For anything spoken aloud, override the name
-  where it is consumed rather than fighting the registry.
+- **`friendly_name` carries the device name** once the entity has `device_info`.
+  That is why each control gets a **device of its own** (`_control_device`),
+  named as the user named it and hung off the emitter with `via_device`: one
+  blaster holds a TV, an air conditioner and a fan, so the blaster's name is the
+  wrong one to inherit. The power switch then takes `_attr_name = None` and
+  reads as the control; a key takes its own name and reads "<control> <key>".
 
 ### Alexa
 
@@ -173,8 +178,11 @@ contradicts your instinct, trust the note.
   arrived. pt-BR is served by the North America gateway,
   `https://api.amazonalexa.com/v3/events`.
 - A scene has no *off*: `supports_deactivation=False`, so "turn off <key>" never
-  works. An off key is a separate scene and needs a name that reads after "turn
-  on". The name Alexa gets comes from `entity_config`, falling back to the
+  works. That is why a control can name a **power pair**: the two keys become
+  one `switch` with `assumed_state`, which Alexa drives as a device through
+  `PowerController`. The paired keys get no button of their own, or every
+  assistant would list them twice. A lone key stays a scene and needs a name
+  that reads after "turn on". The name Alexa gets comes from `entity_config`, falling back to the
   entity's own — which carries the device prefix and is unusable by voice.
 - Renaming only reaches Alexa on the next AddOrUpdate, and a deleted key leaves
   a dead scene behind unless a DeleteReport goes out. Both are wired:

@@ -162,6 +162,28 @@ todas as teclas, e nenhuma descoberta resolve. O bloco gerado já vem certo.
 [Expondo seus aparelhos para a Alexa](ALEXA.pt-BR.md) cobre o resto, e
 [Montando a skill da Alexa do zero](ALEXA_SKILL.pt-BR.md) cobre a skill em si.
 
+### Um par liga/desliga é melhor que duas cenas
+
+Uma tecla sozinha é um disparo único, então a Alexa só consegue vê-la como cena.
+Um par — uma tecla que liga o aparelho e uma que desliga — é um **dispositivo**,
+e vale a pena montar: "ligar o ar condicionado" e "desligar o ar condicionado"
+funcionam os dois, que é como qualquer um espera falar com um aparelho.
+
+Em **Editar**, no **Par de energia**, escolha a tecla que liga e a que desliga.
+As duas deixam de ser cenas e viram um switch só.
+
+Cada controle é um dispositivo próprio no Home Assistant, com o nome que você
+deu e listado embaixo do emissor — um blaster guarda uma televisão, um ar
+condicionado e um ventilador, e cada um tem que atender pelo nome dele. Então o
+switch aparece como "Ar da sala", e uma tecla como "Ar da sala Frio 22".
+
+Infravermelho é mão única, então o switch não tem como saber o que o aparelho
+está fazendo de verdade: ele mostra o que foi enviado por último. O Home
+Assistant marca como estado presumido e desenha dois botões em vez de uma
+chave.
+
+O resto continua cena, que é o certo para tecla de disparo único como "Frio 22".
+
 ### Dar um nome que a Alexa entenda
 
 A Alexa enxerga botão como **cena**, e cena só atende a *ligar* (ou *ativar*).

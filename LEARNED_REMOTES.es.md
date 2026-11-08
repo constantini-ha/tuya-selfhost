@@ -165,6 +165,30 @@ viene bien.
 [Exponiendo tus dispositivos a Alexa](ALEXA.es.md) cubre el resto, y
 [Montando la skill de Alexa desde cero](ALEXA_SKILL.es.md) cubre la skill en sí.
 
+### Un par de encendido es mejor que dos escenas
+
+Una tecla suelta es un disparo único, así que Alexa solo puede verla como una
+escena. Un par — una tecla que enciende el aparato y otra que lo apaga — es un
+**dispositivo**, y merece la pena montarlo: "enciende el aire acondicionado" y
+"apaga el aire acondicionado" funcionan las dos, que es como cualquiera espera
+hablarle a un aparato.
+
+En **Editar**, en **Par de encendido**, elige la tecla que enciende y la que
+apaga. Las dos dejan de ser escenas y se convierten en un solo switch.
+
+Cada mando es un dispositivo propio en Home Assistant, con el nombre que le
+diste y listado bajo el emisor — un blaster guarda un televisor, un aire
+acondicionado y un ventilador, y cada uno tiene que responder por su nombre. Así
+el switch aparece como "Aire del salón", y una tecla como "Aire del salón Frío
+22".
+
+El infrarrojo es de un solo sentido, así que el switch no puede saber qué está
+haciendo el aparato de verdad: muestra lo último que se envió. Home Assistant lo
+marca como estado supuesto y dibuja dos botones en vez de un interruptor.
+
+Lo demás sigue siendo escena, que es lo correcto para una tecla de disparo único
+como "Frío 22".
+
 ### Ponerle un nombre que Alexa entienda
 
 Alexa ve un botón como una **escena**, y una escena solo responde a *enciende*

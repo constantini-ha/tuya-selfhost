@@ -104,7 +104,9 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
             if item.disabled_by or item.hidden_by or item.domain not in ALEXA_DOMAINS:
                 continue
             state = hass.states.get(item.entity_id)
-            if item.entity_id.startswith(f"button.{OBJECT_ID_PREFIX}_"):
+            if item.entity_id.startswith(
+                (f"button.{OBJECT_ID_PREFIX}_", f"switch.{OBJECT_ID_PREFIX}_")
+            ):
                 # A remote key is already named "<remote> <key>"; the device name
                 # Home Assistant prepends would make it unspeakable.
                 name = item.name or item.original_name or item.entity_id
@@ -133,6 +135,7 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
         "      # are already covered: Alexa only has to discover devices again.",
         "      include_entity_globs:",
         f"        - button.{OBJECT_ID_PREFIX}_*",
+        f"        - switch.{OBJECT_ID_PREFIX}_*",
         "      include_entities:",
     ]
     lines += [f"        - {entity_id}" for entity_id, _ in entities]
@@ -157,7 +160,9 @@ async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
         item.entity_id
         for entry in hass.config_entries.async_entries(DOMAIN)
         for item in er.async_entries_for_config_entry(registry, entry.entry_id)
-        if item.entity_id.startswith(f"button.{OBJECT_ID_PREFIX}_")
+        if item.entity_id.startswith(
+            (f"button.{OBJECT_ID_PREFIX}_", f"switch.{OBJECT_ID_PREFIX}_")
+        )
         and not item.disabled_by
         and not item.hidden_by
     ]
