@@ -38,7 +38,20 @@ const STYLE = `
   .power.on { background:var(--primary-color); color:var(--text-primary-color) }
   .power ha-icon { --mdc-icon-size:19px }
   .body { border-top:1px solid var(--divider-color) }
+  .gangs { display:flex; gap:2px; padding:0 10px 14px }
+  .gang { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:5px;
+    border:none; background:transparent; cursor:pointer; font:inherit; padding:2px }
+  .gang .dot { width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; transition:all .18s }
+  .gang .dot ha-icon { --mdc-icon-size:19px }
+  .gang .lbl { font-size:.7em; line-height:1.15; max-width:100%; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; color:var(--primary-text-color) }
+  .gang .st { font-size:.64em; color:var(--secondary-text-color) }
+  .gang.off .lbl, .gang.off .st { opacity:.55 }
 `;
+
+// One colour per key, like the vendor app, so a six gang switch is readable at a glance.
+const CORES = ["#3B9EFF", "#34C759", "#FF8A3D", "#FFCC33", "#C77DFF", "#FF5D8F"];
 
 class TuyaSelfhostDeviceCard extends HTMLElement {
   setConfig(config) {
@@ -169,6 +182,34 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         this._render();
       });
       card.appendChild(head);
+
+      if (this._gangs.length > 1) {
+        const row = document.createElement("div");
+        row.className = "gangs";
+        this._gangs.forEach((id, index) => {
+          const st = this._hass.states[id];
+          const on = st && st.state === "on";
+          const cor = CORES[index % CORES.length];
+          const b = document.createElement("button");
+          b.className = on ? "gang" : "gang off";
+          b.title = this._name(id);
+          b.innerHTML = `
+            <span class="dot"><ha-icon icon="mdi:power"></ha-icon></span>
+            <span class="lbl">${this._name(id)}</span>
+            <span class="st">${on ? "Ligado" : st && st.state === "unavailable" ? "—" : "Desligado"}</span>`;
+          const dot = b.querySelector(".dot");
+          dot.style.color = on ? cor : "var(--secondary-text-color)";
+          dot.style.background = on
+            ? `color-mix(in srgb, ${cor} 22%, transparent)`
+            : "var(--secondary-background-color)";
+          b.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            this._hass.callService("homeassistant", "toggle", { entity_id: id });
+          });
+          row.appendChild(b);
+        });
+        card.appendChild(row);
+      }
 
       if (!this._expanded) {
         const style = document.createElement("style");
