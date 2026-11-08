@@ -144,13 +144,20 @@ A Alexa trata botão como cena, então o comando é *ligar*:
 
 O bloco gerado pela ação **configuração da Alexa** já traz um curinga que cobre
 todas as teclas, as de hoje e as de amanhã, então você nunca precisa gerar de
-novo depois de ensinar mais uma. O que você precisa fazer é deixar a Alexa
-achar:
+novo depois de ensinar mais uma. Ensinar uma tecla já entrega ela para a Alexa na hora, então normalmente não
+sobra nada para fazer. O Home Assistant só faz isso para quem assina o Nabu
+Casa; a integração faz também para quem tem skill própria.
+
+Se alguma tecla não aparecer — a Alexa estava fora do ar, ou você montou a skill
+depois de ensinar —, a aba Alexa do painel tem **Enviar as teclas para a
+Alexa**, e a ação `tuya_selfhost.alexa_announce` faz o mesmo de dentro de uma
+automação. Na falta das duas, o caminho antigo continua valendo:
 
 > "Alexa, descobrir dispositivos"
 
-Uma skill própria não fica sabendo de entidade nova sozinha — só quem assina o
-Nabu Casa tem isso. Uma descoberta depois de criar as teclas é todo o custo.
+Uma coisa para conferir se não chega nada: o seu filtro do `alexa:` precisa
+deixar passar botão. Um filtro que só diz `include_domains: [switch]` derruba
+todas as teclas, e nenhuma descoberta resolve. O bloco gerado já vem certo.
 
 [Expondo seus aparelhos para a Alexa](ALEXA.pt-BR.md) cobre o resto, e
 [Montando a skill da Alexa do zero](ALEXA_SKILL.pt-BR.md) cobre a skill em si.

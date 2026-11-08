@@ -146,14 +146,21 @@ Alexa trata un botón como una escena, así que la orden es *enciende*:
 
 El bloque que genera la acción **configuración de Alexa** ya trae un comodín que
 cubre todas las teclas, las de hoy y las de mañana, así que nunca tienes que
-volver a generarlo después de enseñar una más. Lo que sí tienes que hacer es
-dejar que Alexa la encuentre:
+volver a generarlo después de enseñar una más. Enseñar una tecla ya se la entrega a Alexa en el momento, así que normalmente
+no queda nada por hacer. Home Assistant solo hace eso para quien paga Nabu Casa;
+la integración lo hace también para una skill propia.
+
+Si alguna tecla no aparece — Alexa estaba caída, o montaste la skill después de
+enseñarla —, la pestaña Alexa del panel tiene **Enviar las teclas a Alexa**, y
+la acción `tuya_selfhost.alexa_announce` hace lo mismo desde una automatización.
+A falta de las dos, el camino de siempre sigue valiendo:
 
 > "Alexa, detecta dispositivos"
 
-Una skill propia no se entera de una entidad nueva por su cuenta — eso solo lo
-tiene quien paga Nabu Casa. Un descubrimiento después de crear las teclas es
-todo el coste.
+Una cosa que comprobar si no llega nada: tu filtro de `alexa:` tiene que dejar
+pasar los botones. Un filtro que solo dice `include_domains: [switch]` tira
+todas las teclas, y ningún descubrimiento lo arregla. El bloque generado ya
+viene bien.
 
 [Exponiendo tus dispositivos a Alexa](ALEXA.es.md) cubre el resto, y
 [Montando la skill de Alexa desde cero](ALEXA_SKILL.es.md) cubre la skill en sí.

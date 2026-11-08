@@ -481,6 +481,21 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
+  async _announceKeys() {
+    try {
+      const result = await this._hass.callService(
+        "tuya_selfhost", "alexa_announce", {}, undefined, false, true
+      );
+      const answer = (result && result.response) || {};
+      if (!answer.entity_count) this._flash = this._t("keys_none");
+      else if (answer.sent) this._flash = this._t("keys_sent", { n: answer.entity_count });
+      else this._flash = this._t("keys_not_sent");
+    } catch (err) {
+      this._flash = this._t("keys_not_sent");
+    }
+    this._render();
+  }
+
   _renderSettings() {
     const card = document.createElement("ha-card");
     card.header = this._t("settings_title");
@@ -664,6 +679,12 @@ class TuyaSelfhostPanel extends HTMLElement {
     keys.className = "block";
     keys.innerHTML = `<h3>${this._t("keys_title")}</h3>
       <div class="muted">${this._t("keys_text")}</div>`;
+    const send = document.createElement("button");
+    send.className = "act";
+    send.style.marginTop = "10px";
+    send.textContent = this._t("send_keys");
+    send.addEventListener("click", () => this._announceKeys());
+    keys.appendChild(send);
     box.appendChild(keys);
 
     const guide = document.createElement("div");

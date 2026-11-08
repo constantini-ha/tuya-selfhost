@@ -146,6 +146,10 @@
         "alexa_config": {
             "name": "Alexa configuration",
             "description": "Builds a ready-to-paste alexa: block listing every Tuya Selfhost entity, so you do not have to type entity IDs by hand."
+        },
+        "alexa_announce": {
+            "name": "Send remote keys to Alexa",
+            "description": "Hands every learned remote key to Alexa straight away, so you do not have to ask it to discover devices."
         }
     },
     "entity": {

@@ -21,7 +21,7 @@ from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .helpers.arp import arp_table
 from .infrared import TuyaRemoteCommand
 from .remote import FLAG_SAVE_DELAY, TuyaLocalRemote
-from .remote_keys import OBJECT_ID_PREFIX
+from .remote_keys import OBJECT_ID_PREFIX, async_announce_to_alexa
 
 REMOTE_SEND_IR_COMMAND_SCHEMA = {
     vol.Required("emitter_entity_id"): cv.entity_id,
@@ -47,6 +47,13 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
         DOMAIN,
         "alexa_config",
         partial(async_handle_alexa_config, hass),
+        schema=vol.Schema({}),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "alexa_announce",
+        partial(async_handle_alexa_announce, hass),
         schema=vol.Schema({}),
         supports_response=SupportsResponse.ONLY,
     )
@@ -131,6 +138,21 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
         lines.append(f"        name: {_yaml_quote(name)}")
 
     return {"yaml": "\n".join(lines), "entity_count": len(entities)}
+
+async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
+    """Hand every remote key to Alexa, without waiting for a discovery."""
+    registry = er.async_get(hass)
+    entity_ids = [
+        item.entity_id
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        for item in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if item.entity_id.startswith(f"button.{OBJECT_ID_PREFIX}_")
+        and not item.disabled_by
+        and not item.hidden_by
+    ]
+    sent = await async_announce_to_alexa(hass, entity_ids)
+    return {"entity_count": len(entity_ids), "sent": sent}
+
 
 def _host_sort_key(device: dict) -> list[int]:
     """Sort by IP, pushing anything unparseable to the end."""

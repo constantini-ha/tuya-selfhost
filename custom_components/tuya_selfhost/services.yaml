@@ -26,3 +26,6 @@ network_report:
 
 alexa_config:
   fields: {}
+
+alexa_announce:
+  fields: {}

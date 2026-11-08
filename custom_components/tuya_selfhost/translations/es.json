@@ -146,6 +146,10 @@
         "alexa_config": {
             "name": "Configuración de Alexa",
             "description": "Genera un bloque alexa: listo para pegar con todas las entidades de Tuya Selfhost, para no escribir los IDs a mano."
+        },
+        "alexa_announce": {
+            "name": "Enviar las teclas a Alexa",
+            "description": "Entrega al momento todas las teclas de mando aprendidas a Alexa, para que no tengas que pedirle que detecte dispositivos."
         }
     },
     "entity": {

@@ -101,7 +101,11 @@ const STRINGS = {
     guide_link: "Full guide: skill, Lambda and account linking",
     guide_url: "https://github.com/constantini-ha/tuya-selfhost/blob/main/ALEXA_SKILL.md",
     "keys_title": "Remote keys",
-    "keys_text": "Every key you teach becomes a button here, and Alexa turns it on like a scene: \u201cAlexa, turn on Living room AC Cool 22\u201d. The filter above already covers keys you have not learned yet \u2014 after adding one, say \u201cAlexa, discover devices\u201d. A self-hosted skill is not told about new entities on its own.",
+    "keys_text": "Every key you teach becomes a button here and is handed to Alexa right away, which turns it on like a scene: \u201cAlexa, turn on Living room AC Cool 22\u201d. If one does not arrive, send them again below, or say \u201cAlexa, discover devices\u201d.",
+    "send_keys": "Send the keys to Alexa",
+    "keys_sent": "{n} keys sent to Alexa",
+    "keys_not_sent": "Alexa did not take them \u2014 say \u201cAlexa, discover devices\u201d",
+    "keys_none": "No remote key yet",
   },
   "pt-BR": {
     devices: "Seus aparelhos",
@@ -202,7 +206,11 @@ const STRINGS = {
     guide_link: "Guia completo: skill, Lambda e v\u00ednculo de conta",
     guide_url: "https://github.com/constantini-ha/tuya-selfhost/blob/main/ALEXA_SKILL.pt-BR.md",
     "keys_title": "Teclas dos controles",
-    "keys_text": "Cada tecla que voc\u00ea ensina vira um bot\u00e3o aqui, e a Alexa liga como se fosse uma cena: \u201cAlexa, ligar Ar da sala Frio 22\u201d. O filtro acima j\u00e1 cobre as teclas que voc\u00ea ainda nem gravou \u2014 depois de criar uma, diga \u201cAlexa, descobrir dispositivos\u201d. Uma skill pr\u00f3pria n\u00e3o fica sabendo de entidade nova sozinha.",
+    "keys_text": "Cada tecla que voc\u00ea ensina vira um bot\u00e3o aqui e j\u00e1 vai para a Alexa na hora, que liga como se fosse uma cena: \u201cAlexa, ligar Ar da sala Frio 22\u201d. Se alguma n\u00e3o chegar, reenvie abaixo ou diga \u201cAlexa, descobrir dispositivos\u201d.",
+    "send_keys": "Enviar as teclas para a Alexa",
+    "keys_sent": "{n} teclas enviadas para a Alexa",
+    "keys_not_sent": "A Alexa n\u00e3o aceitou \u2014 diga \u201cAlexa, descobrir dispositivos\u201d",
+    "keys_none": "Nenhuma tecla de controle ainda",
   },
   es: {
     devices: "Tus dispositivos",
@@ -303,7 +311,11 @@ const STRINGS = {
     guide_link: "Gu\u00eda completa: skill, Lambda y vinculaci\u00f3n de cuenta",
     guide_url: "https://github.com/constantini-ha/tuya-selfhost/blob/main/ALEXA_SKILL.es.md",
     "keys_title": "Teclas de los mandos",
-    "keys_text": "Cada tecla que ense\u00f1as se convierte en un bot\u00f3n aqu\u00ed, y Alexa la enciende como si fuera una escena: \u201cAlexa, enciende Aire del sal\u00f3n Fr\u00edo 22\u201d. El filtro de arriba ya cubre las teclas que todav\u00eda no has grabado \u2014 despu\u00e9s de crear una, di \u201cAlexa, detecta dispositivos\u201d. Una skill propia no se entera de una entidad nueva por su cuenta.",
+    "keys_text": "Cada tecla que ense\u00f1as se convierte en un bot\u00f3n aqu\u00ed y se le entrega a Alexa al momento, que la enciende como si fuera una escena: \u201cAlexa, enciende Aire del sal\u00f3n Fr\u00edo 22\u201d. Si alguna no llega, vu\u00e9lvelas a enviar abajo o di \u201cAlexa, detecta dispositivos\u201d.",
+    "send_keys": "Enviar las teclas a Alexa",
+    "keys_sent": "{n} teclas enviadas a Alexa",
+    "keys_not_sent": "Alexa no las acept\u00f3 \u2014 di \u201cAlexa, detecta dispositivos\u201d",
+    "keys_none": "Todav\u00eda no hay ninguna tecla de mando",
   },
 };
 

@@ -150,13 +150,23 @@ contradicts your instinct, trust the note.
 - `button` maps to `AlexaSceneController` (no deactivation), display category
   `ACTIVITY_TRIGGER`. The phrase is "turn on <name>", and that is why remote
   keys are buttons rather than scripts.
-- **A self-hosted skill is not told about new entities.**
+- **Home Assistant does not tell a self-hosted skill about new entities.**
   `async_send_add_or_update_message` is only called from `cloud/alexa_config.py`
-  (Nabu Casa). With a manual `alexa:` block the user has to say "discover
-  devices" after adding a key. Say so in the UI; do not imply otherwise.
-- The generated block therefore carries `include_entity_globs` with
-  `button.tuya_remote_*`, so keys learned later are already in the filter and
-  only the discovery is missing.
+  (Nabu Casa). `remote_keys.async_announce_to_alexa` closes that gap by calling
+  it ourselves whenever a key becomes an entity, and the `alexa_announce` action
+  does it on demand.
+- **Getting at the manual Alexa config is the catch.** `smart_home.async_setup`
+  builds `AlexaConfig` and hands it to the HTTP view; it is in no `hass.data`,
+  so `_alexa_config()` walks `hass.http.app.router` for the route whose
+  canonical path is `/api/alexa/smart_home` and digs the view out of the
+  handler's closure. That is an internal reach: keep every step guarded and
+  fall back to "say discover devices" rather than failing.
+- Check `config.should_report_state` first. Without proactive reporting there
+  is no token to push with, and the call would only raise.
+- The generated block carries `include_entity_globs` with
+  `button.tuya_remote_*`, so keys learned later are already in the filter. A
+  filter that only lists `include_domains: [switch]` — a common hand-written
+  one — silently drops every key, and no amount of discovering will help.
 - Proactive state reporting needs `endpoint`, `client_id` and `client_secret`,
   **and the skill relinked**: Amazon only sends the authorisation grant at the
   moment the account is linked. `.storage/alexa_auth` appearing is the proof it

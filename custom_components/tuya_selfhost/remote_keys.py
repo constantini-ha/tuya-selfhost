@@ -23,6 +23,7 @@ from .remote_card import SIGNAL_LAYOUTS, STORAGE_KEY
 _LOGGER = logging.getLogger(__name__)
 
 OBJECT_ID_PREFIX = "tuya_remote"
+ALEXA_ENDPOINT = "/api/alexa/smart_home"
 
 
 async def async_setup_remote_keys(
@@ -59,6 +60,7 @@ async def async_setup_remote_keys(
         if fresh:
             async_add_entities(fresh)
             known.update(b.unique_id for b in fresh)
+            await async_announce_to_alexa(hass, [b.entity_id for b in fresh])
 
         for uid in known - set(wanted):
             entity_id = registry.async_get_entity_id("button", DOMAIN, uid)
@@ -104,3 +106,68 @@ class RemoteKeyButton(ButtonEntity):
             },
             blocking=True,
         )
+
+
+def _alexa_config(hass: HomeAssistant):
+    """Find the config of a self-hosted Alexa skill.
+
+    Home Assistant keeps it on the view that serves the skill and nowhere else,
+    so there is no supported way to ask for it. Everything here is best effort.
+    """
+    try:
+        routes = hass.http.app.router.routes()
+    except AttributeError:
+        return None
+
+    for route in routes:
+        resource = getattr(route, "resource", None)
+        if getattr(resource, "canonical", None) != ALEXA_ENDPOINT:
+            continue
+        handler = getattr(route, "handler", None)
+        view = getattr(handler, "__self__", None)
+        config = getattr(view, "smart_home_config", None)
+        if config is not None:
+            return config
+        for cell in getattr(handler, "__closure__", None) or ():
+            try:
+                candidate = cell.cell_contents
+            except ValueError:
+                continue
+            config = getattr(candidate, "smart_home_config", None)
+            if config is not None:
+                return config
+    return None
+
+
+async def async_announce_to_alexa(hass: HomeAssistant, entity_ids: list[str]) -> bool:
+    """Hand new keys to Alexa, so the user does not have to run a discovery.
+
+    Home Assistant sends this only for Nabu Casa accounts; a self-hosted skill
+    is left to find out on its own. When anything is missing — no Alexa, no
+    proactive reporting, no grant yet — the user still has "discover devices".
+    """
+    try:
+        from homeassistant.components.alexa.state_report import (
+            async_send_add_or_update_message,
+        )
+    except ImportError:
+        return False
+
+    if not entity_ids:
+        return False
+
+    config = _alexa_config(hass)
+    if config is None:
+        _LOGGER.debug("No self-hosted Alexa skill set up; keys not announced")
+        return False
+    if not getattr(config, "should_report_state", False):
+        _LOGGER.debug("Alexa proactive reporting is off; keys not announced")
+        return False
+
+    try:
+        await async_send_add_or_update_message(hass, config, entity_ids)
+    except Exception as err:  # the skill is Amazon's, every failure is theirs
+        _LOGGER.debug("Alexa did not accept the new keys (%s); ask it to discover", err)
+        return False
+    _LOGGER.info("Announced %s to Alexa", ", ".join(entity_ids))
+    return True
