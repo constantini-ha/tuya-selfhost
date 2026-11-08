@@ -65,6 +65,28 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .tools { display:flex; justify-content:center; gap:1px; margin-top:3px }
 .tools button { border:none; background:transparent; color:#7D879C; cursor:pointer;
   font:inherit; font-size:11px; padding:1px 3px }
+.tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:4px 0 }
+.tilewrap { text-align:center }
+.tile { width:100%; aspect-ratio:2/3; border-radius:18px; cursor:pointer; padding:0 0 14px;
+  display:flex; align-items:flex-end; justify-content:center;
+  border:1px solid var(--divider-color); transition:all .18s;
+  background:linear-gradient(180deg, var(--secondary-background-color), var(--card-background-color)) }
+.tile[aria-pressed="true"] { border-color:transparent;
+  background:linear-gradient(180deg, var(--primary-color), var(--primary-color));
+  box-shadow:0 8px 20px color-mix(in srgb, var(--primary-color) 45%, transparent) }
+.tile:active { transform:scale(.97) }
+.tile:disabled { opacity:.4; cursor:default }
+.rocker { width:44%; height:6px; border-radius:999px; background:var(--secondary-text-color); opacity:.55 }
+.tile[aria-pressed="true"] .rocker { background:var(--text-primary-color); opacity:.9 }
+.tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color) }
+.actions { display:flex; justify-content:space-around; gap:8px; padding:16px 8px 4px;
+  border-top:1px solid var(--divider-color); margin-top:16px }
+.action { display:flex; flex-direction:column; align-items:center; gap:6px; border:none;
+  background:transparent; cursor:pointer; font:inherit; font-size:.78em;
+  color:var(--secondary-text-color); padding:4px 10px }
+.action .circle { width:46px; height:46px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; background:var(--secondary-background-color) }
+.action ha-icon { --mdc-icon-size:22px }
 .ent { display:flex; align-items:center; gap:12px; padding:9px 0 }
 .ent + .ent { border-top:1px solid var(--divider-color) }
 .ent .name { font-size:.95em }
@@ -372,6 +394,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       row.style.cursor = "pointer";
       row.addEventListener("click", () => {
         this._open = entry.entry_id;
+        this._settings = false;
         this._render();
       });
       row.insertAdjacentHTML(
@@ -393,9 +416,10 @@ class TuyaSelfhostPanel extends HTMLElement {
     head.className = "pad row";
     const back = document.createElement("button");
     back.className = "act ghost";
-    back.textContent = "← Aparelhos";
+    back.textContent = this._settings ? "← Voltar" : "← Aparelhos";
     back.addEventListener("click", () => {
-      this._open = null;
+      if (this._settings) this._settings = false;
+      else this._open = null;
       this._render();
     });
     head.appendChild(back);
@@ -403,17 +427,78 @@ class TuyaSelfhostPanel extends HTMLElement {
     card.appendChild(head);
 
     const entities = this._byEntry[entry.entry_id] || [];
-    const list = document.createElement("div");
-    list.className = "pad";
-    const title = document.createElement("div");
-    title.className = "muted";
-    title.style.marginBottom = "4px";
-    title.textContent = "Entidades";
-    list.appendChild(title);
-    for (const item of this._sorted(entities)) {
-      list.appendChild(this._entityRow(item));
+    const gangs = entities.filter((e) => e.entity_id.startsWith("switch."));
+    const rest = entities.filter((e) => !e.entity_id.startsWith("switch."));
+
+    if (this._settings) {
+      const list = document.createElement("div");
+      list.className = "pad";
+      const title = document.createElement("div");
+      title.className = "muted";
+      title.style.marginBottom = "4px";
+      title.textContent = "Configurações";
+      list.appendChild(title);
+      for (const item of this._sorted(rest.length ? rest : entities)) {
+        list.appendChild(this._entityRow(item));
+      }
+      card.appendChild(list);
+      return card;
     }
-    card.appendChild(list);
+
+    if (gangs.length) {
+      const grid = document.createElement("div");
+      grid.className = "pad tiles";
+      grid.style.gridTemplateColumns = "repeat(3, 1fr)";
+      for (const item of gangs) {
+        const state = this._hass.states[item.entity_id];
+        const on = state && state.state === "on";
+        const wrap = document.createElement("div");
+        wrap.className = "tilewrap";
+        const tile = document.createElement("button");
+        tile.className = "tile";
+        tile.setAttribute("aria-pressed", on ? "true" : "false");
+        tile.disabled = !state || state.state === "unavailable";
+        tile.innerHTML = '<span class="rocker"></span>';
+        tile.addEventListener("click", () =>
+          this._hass.callService("homeassistant", "toggle", { entity_id: item.entity_id })
+        );
+        const name = document.createElement("div");
+        name.className = "tilename";
+        name.textContent = this._friendly(item.entity_id).replace(entry.title, "").trim() ||
+          this._friendly(item.entity_id);
+        wrap.append(tile, name);
+        grid.appendChild(wrap);
+      }
+      card.appendChild(grid);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const action = (icon, label, fn) => {
+      const b = document.createElement("button");
+      b.className = "action";
+      b.innerHTML = `<span class="circle"><ha-icon icon="${icon}"></ha-icon></span><span>${label}</span>`;
+      b.addEventListener("click", fn);
+      return b;
+    };
+    if (gangs.length) {
+      const ids = gangs.map((e) => e.entity_id);
+      actions.append(
+        action("mdi:flash", "Ligar tudo", () =>
+          this._hass.callService("homeassistant", "turn_on", { entity_id: ids })
+        ),
+        action("mdi:flash-off", "Desligar tudo", () =>
+          this._hass.callService("homeassistant", "turn_off", { entity_id: ids })
+        )
+      );
+    }
+    actions.append(
+      action("mdi:cog-outline", "Configurações", () => {
+        this._settings = true;
+        this._render();
+      })
+    );
+    card.appendChild(actions);
 
     if (remote) {
       const section = document.createElement("div");
