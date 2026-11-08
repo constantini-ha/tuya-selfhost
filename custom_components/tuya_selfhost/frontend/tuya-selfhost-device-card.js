@@ -35,7 +35,9 @@ const STYLE = `
   .power { width:38px; height:38px; border-radius:50%; border:none; cursor:pointer; display:flex;
     align-items:center; justify-content:center; background:var(--secondary-background-color);
     color:var(--secondary-text-color) }
-  .power.on { background:var(--primary-color); color:var(--text-primary-color) }
+    .power.on { background:var(--primary-color); color:var(--text-primary-color) }
+  .power.small { width:30px; height:30px }
+  .power.small ha-icon { --mdc-icon-size:16px }
   .power ha-icon { --mdc-icon-size:19px }
   .body { border-top:1px solid var(--divider-color) }
   .gangs { display:flex; gap:2px; padding:0 10px 14px }
@@ -165,14 +167,15 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         });
         return b;
       };
-      quick.append(
-        power("mdi:power", anyOn, () =>
-          this._hass.callService("homeassistant", anyOn ? "turn_off" : "turn_on", {
-            entity_id: this._gangs,
-          }),
-          anyOn ? "Desligar tudo" : "Ligar tudo"
-        )
+      const geral = power("mdi:power", anyOn, () =>
+        this._hass.callService("homeassistant", anyOn ? "turn_off" : "turn_on", {
+          entity_id: this._gangs,
+        }),
+        anyOn ? "Desligar tudo" : "Ligar tudo"
       );
+      // with a key of its own per gang, the all-at-once button is a secondary action
+      if (this._gangs.length > 1) geral.classList.add("small");
+      quick.append(geral);
       const chev = document.createElement("ha-icon");
       chev.setAttribute("icon", "mdi:chevron-down");
       chev.className = this._expanded ? "chev open" : "chev";
@@ -198,10 +201,14 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
             <span class="lbl">${this._name(id)}</span>
             <span class="st">${on ? "Ligado" : st && st.state === "unavailable" ? "—" : "Desligado"}</span>`;
           const dot = b.querySelector(".dot");
-          dot.style.color = on ? cor : "var(--secondary-text-color)";
+          dot.style.color = cor;
+          dot.style.opacity = on ? "1" : "0.42";
           dot.style.background = on
-            ? `color-mix(in srgb, ${cor} 22%, transparent)`
-            : "var(--secondary-background-color)";
+            ? `color-mix(in srgb, ${cor} 24%, transparent)`
+            : `color-mix(in srgb, ${cor} 10%, transparent)`;
+          dot.style.boxShadow = on
+            ? `0 0 0 2px color-mix(in srgb, ${cor} 55%, transparent)`
+            : "none";
           b.addEventListener("click", (ev) => {
             ev.stopPropagation();
             this._hass.callService("homeassistant", "toggle", { entity_id: id });
