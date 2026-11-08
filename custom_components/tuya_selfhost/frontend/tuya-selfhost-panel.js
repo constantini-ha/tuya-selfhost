@@ -16,6 +16,9 @@ const STYLE = `
   background:var(--app-header-background-color, var(--primary-color));
   color:var(--app-header-text-color, var(--text-primary-color)) }
 .bar h1 { flex:1; margin:0; font-size:20px; font-weight:400 }
+.bar button.menu { border:none; background:transparent; color:inherit; cursor:pointer;
+  padding:8px; border-radius:50%; display:flex; line-height:0 }
+.bar button.menu:hover { background:rgba(127,127,127,.18) }
 .wrap { padding:16px; max-width:920px; margin:0 auto }
 ha-card { margin-bottom:16px; overflow:hidden }
 .pad { padding:16px }
@@ -62,6 +65,17 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .tools { display:flex; justify-content:center; gap:1px; margin-top:3px }
 .tools button { border:none; background:transparent; color:#7D879C; cursor:pointer;
   font:inherit; font-size:11px; padding:1px 3px }
+.ent { display:flex; align-items:center; gap:12px; padding:9px 0 }
+.ent + .ent { border-top:1px solid var(--divider-color) }
+.ent .name { font-size:.95em }
+.ent .eid { font-size:.72em; color:var(--secondary-text-color) }
+.toggle { width:46px; height:26px; border-radius:999px; border:none; cursor:pointer; padding:0;
+  background:var(--divider-color); position:relative; transition:background .18s; flex:none }
+.toggle .knob { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%;
+  background:#fff; transition:transform .18s; box-shadow:0 1px 3px rgba(0,0,0,.4) }
+.toggle[aria-checked="true"] { background:var(--primary-color) }
+.toggle[aria-checked="true"] .knob { transform:translateX(20px) }
+.toggle:disabled { opacity:.4; cursor:default }
 .banner { margin:14px 0 0; padding:12px 14px; border-radius:10px; font-size:13px;
   background:var(--primary-color); color:var(--text-primary-color) }
 .banner button { margin:10px 6px 0 0 }
@@ -81,12 +95,28 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._ready = false;
   }
 
+  set narrow(value) {
+    this._narrow = value;
+  }
+
   set hass(hass) {
     this._hass = hass;
     if (!this._ready) {
       this._ready = true;
       this._boot();
+      return;
     }
+    // Follow the device the user is looking at, so a toggle lands visibly.
+    if (this._open && !this._remote) {
+      const signature = this._signature();
+      if (signature !== this._signature_shown) this._render();
+    }
+  }
+
+  _signature() {
+    return (this._byEntry[this._open] || [])
+      .map((e) => (this._hass.states[e.entity_id] || {}).state)
+      .join("|");
   }
 
   async _boot() {
@@ -280,7 +310,20 @@ class TuyaSelfhostPanel extends HTMLElement {
     const root = document.createElement("div");
     const bar = document.createElement("div");
     bar.className = "bar";
-    bar.innerHTML = `<ha-icon icon="mdi:home-automation"></ha-icon><h1>Tuya Selfhost</h1>`;
+    const menu = document.createElement("button");
+    menu.className = "menu";
+    menu.title = "Menu";
+    menu.innerHTML = `<ha-icon icon="mdi:menu"></ha-icon>`;
+    // Our own header replaces Home Assistant's, so it has to carry the way back
+    // to the sidebar as well.
+    menu.addEventListener("click", () =>
+      this.dispatchEvent(
+        new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true })
+      )
+    );
+    const title = document.createElement("h1");
+    title.textContent = "Tuya Selfhost";
+    bar.append(menu, title);
     root.appendChild(bar);
 
     const wrap = document.createElement("div");
@@ -300,6 +343,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     } else if (this._remote) {
       wrap.appendChild(this._renderRemote());
     } else if (this._open) {
+      this._signature_shown = this._signature();
       wrap.appendChild(this._renderDevice());
     } else {
       wrap.appendChild(this._renderList());
@@ -361,20 +405,14 @@ class TuyaSelfhostPanel extends HTMLElement {
     const entities = this._byEntry[entry.entry_id] || [];
     const list = document.createElement("div");
     list.className = "pad";
-    list.innerHTML =
-      `<div class="muted" style="margin-bottom:8px">Entidades</div>` +
-      entities
-        .slice(0, 12)
-        .map(
-          (e) =>
-            `<div class="row" style="padding:5px 0"><span class="grow">${
-              e.entity_id
-            }</span><span class="pill">${this._stateOf(e.entity_id)}</span></div>`
-        )
-        .join("") +
-      (entities.length > 12
-        ? `<div class="muted">e mais ${entities.length - 12}…</div>`
-        : "");
+    const title = document.createElement("div");
+    title.className = "muted";
+    title.style.marginBottom = "4px";
+    title.textContent = "Entidades";
+    list.appendChild(title);
+    for (const item of this._sorted(entities)) {
+      list.appendChild(this._entityRow(item));
+    }
     card.appendChild(list);
 
     if (remote) {
@@ -427,6 +465,91 @@ class TuyaSelfhostPanel extends HTMLElement {
       card.appendChild(section);
     }
     return card;
+  }
+
+  _sorted(entities) {
+    const rank = (id) => {
+      const domain = id.split(".")[0];
+      if (["switch", "light", "fan", "climate", "cover", "lock", "humidifier", "siren"].includes(domain)) return 0;
+      if (["button", "scene", "select", "number"].includes(domain)) return 1;
+      return 2;
+    };
+    return [...entities].sort(
+      (a, b) => rank(a.entity_id) - rank(b.entity_id) || a.entity_id.localeCompare(b.entity_id)
+    );
+  }
+
+  _friendly(entityId) {
+    const state = this._hass.states[entityId];
+    return (state && state.attributes && state.attributes.friendly_name) || entityId;
+  }
+
+  _entityRow(item) {
+    const id = item.entity_id;
+    const domain = id.split(".")[0];
+    const state = this._hass.states[id];
+    const row = document.createElement("div");
+    row.className = "ent";
+    const label = document.createElement("div");
+    label.className = "grow";
+    label.innerHTML = `<div class="name">${this._friendly(id)}</div><div class="eid">${id}</div>`;
+    row.appendChild(label);
+
+    const TOGGLEABLE = ["switch", "light", "fan", "humidifier", "siren", "input_boolean"];
+    if (TOGGLEABLE.includes(domain)) {
+      const on = state && state.state === "on";
+      const toggle = document.createElement("button");
+      toggle.className = "toggle";
+      toggle.setAttribute("role", "switch");
+      toggle.setAttribute("aria-checked", on ? "true" : "false");
+      toggle.title = on ? "Desligar" : "Ligar";
+      toggle.disabled = !state || state.state === "unavailable";
+      toggle.innerHTML = '<span class="knob"></span>';
+      toggle.addEventListener("click", () =>
+        this._hass.callService("homeassistant", "toggle", { entity_id: id })
+      );
+      row.appendChild(toggle);
+    } else if (domain === "button" || domain === "scene") {
+      const press = document.createElement("button");
+      press.className = "act ghost";
+      press.textContent = "Acionar";
+      press.addEventListener("click", () =>
+        this._hass.callService(domain, domain === "button" ? "press" : "turn_on", {
+          entity_id: id,
+        })
+      );
+      row.appendChild(press);
+    } else if (domain === "select" && state) {
+      const select = document.createElement("select");
+      for (const option of state.attributes.options || []) {
+        const o = document.createElement("option");
+        o.value = o.textContent = option;
+        o.selected = option === state.state;
+        select.appendChild(o);
+      }
+      select.addEventListener("change", () =>
+        this._hass.callService("select", "select_option", {
+          entity_id: id,
+          option: select.value,
+        })
+      );
+      row.appendChild(select);
+    } else if (domain === "lock" && state) {
+      const locked = state.state === "locked";
+      const act = document.createElement("button");
+      act.className = "act ghost";
+      act.textContent = locked ? "Destrancar" : "Trancar";
+      act.addEventListener("click", () =>
+        this._hass.callService("lock", locked ? "unlock" : "lock", { entity_id: id })
+      );
+      row.appendChild(act);
+    } else {
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = state ? state.state : "—";
+      row.appendChild(pill);
+    }
+    return row;
   }
 
   _renderRemote() {
