@@ -309,6 +309,22 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
+  async _deviceToDashboard() {
+    const entry = this._entry();
+    const config = await this._hass.callWS({ type: "lovelace/config", url_path: null });
+    const card = {
+      type: "custom:tuya-selfhost-device-card",
+      entry_id: entry.entry_id,
+      title: entry.title,
+    };
+    const view = config.views[0];
+    if (view.sections) view.sections.push({ type: "grid", cards: [card] });
+    else (view.cards ||= []).push(card);
+    await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
+    this._flash = `"${entry.title}" foi para o seu painel.`;
+    this._render();
+  }
+
   async _toDashboard() {
     const control = this._control();
     const config = await this._hass.callWS({ type: "lovelace/config", url_path: null });
@@ -498,6 +514,11 @@ class TuyaSelfhostPanel extends HTMLElement {
         this._render();
       })
     );
+    if (gangs.length) {
+      actions.append(
+        action("mdi:view-dashboard-outline", "Ao painel", () => this._deviceToDashboard())
+      );
+    }
     card.appendChild(actions);
 
     if (remote) {

@@ -16,6 +16,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 CARD_FILE = "tuya-selfhost-remote-card.js"
+DEVICE_CARD_FILE = "tuya-selfhost-device-card.js"
 PANEL_FILE = "tuya-selfhost-panel.js"
 PANEL_URL_PATH = "tuya-selfhost"
 FRONTEND_URL = f"/{DOMAIN}/frontend"
@@ -42,7 +43,8 @@ async def async_setup_remote_card(hass: HomeAssistant) -> None:
     )
 
     integration = await async_get_integration(hass, DOMAIN)
-    add_extra_js_url(hass, f"{FRONTEND_URL}/{CARD_FILE}?v={integration.version}")
+    for card in (CARD_FILE, DEVICE_CARD_FILE):
+        add_extra_js_url(hass, f"{FRONTEND_URL}/{card}?v={integration.version}")
 
     await panel_custom.async_register_panel(
         hass,
