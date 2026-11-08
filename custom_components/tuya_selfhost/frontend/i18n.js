@@ -111,6 +111,11 @@ const STRINGS = {
     "power_none": "\u2014 none \u2014",
     "power_on": "Turns on",
     "power_off": "Turns off",
+    "card_needs_entity": "Set the emitter entity in 'entity'",
+    "card_read_failed": "Could not read the remote: {err}",
+    "card_empty": "No key yet. Build the remote on the Tuya Selfhost page, in the sidebar.",
+    "card_send_failed": "Failed: {err}",
+    "assumed": "assumed",
   },
   "pt-BR": {
     devices: "Seus aparelhos",
@@ -221,6 +226,11 @@ const STRINGS = {
     "power_none": "\u2014 nenhuma \u2014",
     "power_on": "Liga",
     "power_off": "Desliga",
+    "card_needs_entity": "Informe a entidade do emissor em 'entity'",
+    "card_read_failed": "N\u00e3o consegui ler o controle: {err}",
+    "card_empty": "Nenhuma tecla ainda. Monte o controle na p\u00e1gina Tuya Selfhost, na barra lateral.",
+    "card_send_failed": "Falhou: {err}",
+    "assumed": "presumido",
   },
   es: {
     devices: "Tus dispositivos",
@@ -331,6 +341,11 @@ const STRINGS = {
     "power_none": "\u2014 ninguna \u2014",
     "power_on": "Enciende",
     "power_off": "Apaga",
+    "card_needs_entity": "Indica la entidad del emisor en 'entity'",
+    "card_read_failed": "No pude leer el mando: {err}",
+    "card_empty": "Todav\u00eda no hay ninguna tecla. Monta el mando en la p\u00e1gina Tuya Selfhost, en la barra lateral.",
+    "card_send_failed": "Fall\u00f3: {err}",
+    "assumed": "supuesto",
   },
 };
 

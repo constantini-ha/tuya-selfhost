@@ -185,6 +185,10 @@ and draws two buttons instead of a toggle.
 
 Everything else stays a scene, which suits a one-shot key like "Cool 22".
 
+On the dashboard the remote's card follows: the switch sits at the top, with the
+state and a power button, and the loose keys fill the grid underneath. The two
+paired keys are not drawn twice.
+
 ### Naming a key so Alexa understands it
 
 Alexa sees a button as a **scene**, and a scene only answers to *turn on*. There

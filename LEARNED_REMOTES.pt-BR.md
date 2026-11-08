@@ -184,6 +184,10 @@ chave.
 
 O resto continua cena, que é o certo para tecla de disparo único como "Frio 22".
 
+No painel o card do controle acompanha: o switch fica no topo, com o estado e um
+botão de energia, e as teclas avulsas preenchem a grade embaixo. As duas teclas
+do par não aparecem duas vezes.
+
 ### Dar um nome que a Alexa entenda
 
 A Alexa enxerga botão como **cena**, e cena só atende a *ligar* (ou *ativar*).

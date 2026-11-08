@@ -106,6 +106,9 @@ contradicts your instinct, trust the note.
 - Icon buttons in the top bar are styled by `.bar button.menu`; that selector is
   scoped to the bar, so an icon button anywhere else needs `.icon` or it renders
   with the browser's default border.
+- A card must not guess an entity id from a name — a rename or a clash breaks it
+  silently. `tuya_selfhost/layout/entities` reads the registry and answers which
+  entity each control and key became.
 - Destructive actions confirm in place: the row or a banner swaps to
   "yes / cancel" rather than opening a dialog. See `_confirmControl` and
   `_confirmButton`.

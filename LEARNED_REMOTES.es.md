@@ -189,6 +189,10 @@ marca como estado supuesto y dibuja dos botones en vez de un interruptor.
 Lo demás sigue siendo escena, que es lo correcto para una tecla de disparo único
 como "Frío 22".
 
+En el panel la tarjeta del mando acompaña: el switch va arriba, con el estado y
+un botón de encendido, y las teclas sueltas llenan la rejilla debajo. Las dos
+teclas del par no se dibujan dos veces.
+
 ### Ponerle un nombre que Alexa entienda
 
 Alexa ve un botón como una **escena**, y una escena solo responde a *enciende*

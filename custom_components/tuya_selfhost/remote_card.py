@@ -8,6 +8,7 @@ from homeassistant.components import panel_custom, websocket_api
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
@@ -61,6 +62,7 @@ async def async_setup_remote_card(hass: HomeAssistant) -> None:
 
     hass.data[STORAGE_KEY] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
 
+    websocket_api.async_register_command(hass, websocket_layout_entities)
     websocket_api.async_register_command(hass, websocket_get_layout)
     websocket_api.async_register_command(hass, websocket_set_layout)
     _LOGGER.debug("Remote builder card served from %s", FRONTEND_URL)
@@ -95,3 +97,38 @@ async def websocket_set_layout(hass, connection, msg):
     await store.async_save(stored)
     async_dispatcher_send(hass, SIGNAL_LAYOUTS)
     connection.send_result(msg["id"], {"saved": True})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/layout/entities",
+        vol.Required("key"): str,
+    }
+)
+@websocket_api.callback
+def websocket_layout_entities(hass, connection, msg):
+    """Say which entity each control and key turned into.
+
+    A card could guess the entity id from the name, but a rename or a clash
+    would quietly break it. The registry knows, so ask the registry.
+    """
+    registry = er.async_get(hass)
+    remote = registry.async_get(msg["key"])
+    found: dict[str, dict] = {}
+    if remote and remote.config_entry_id:
+        prefix = f"{remote.config_entry_id}:"
+        for item in er.async_entries_for_config_entry(
+            registry, remote.config_entry_id
+        ):
+            if not item.unique_id.startswith(prefix):
+                continue
+            parts = item.unique_id[len(prefix):].split(":", 1)
+            if len(parts) != 2:
+                continue
+            control_id, command = parts
+            slot = found.setdefault(control_id, {"power": None, "keys": {}})
+            if command == "power":
+                slot["power"] = item.entity_id
+            else:
+                slot["keys"][command] = item.entity_id
+    connection.send_result(msg["id"], found)
