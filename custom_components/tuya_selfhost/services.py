@@ -18,6 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import service
 
 from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
+from .helpers.arp import arp_table
 from .infrared import TuyaRemoteCommand
 from .remote import FLAG_SAVE_DELAY, TuyaLocalRemote
 
@@ -120,21 +121,6 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
 
     return {"yaml": "\n".join(lines), "entity_count": len(entities)}
 
-def _read_arp_table() -> dict[str, str]:
-    """Map IP to MAC from the kernel ARP cache."""
-    table: dict[str, str] = {}
-    try:
-        with open("/proc/net/arp") as handle:
-            next(handle, None)
-            for line in handle:
-                fields = line.split()
-                if len(fields) >= 4 and fields[3] != "00:00:00:00:00:00":
-                    table[fields[0]] = fields[3].upper()
-    except OSError:
-        _LOGGER.debug("ARP table unavailable")
-    return table
-
-
 def _host_sort_key(device: dict) -> list[int]:
     """Sort by IP, pushing anything unparseable to the end."""
     parts = device["host"].split(".")
@@ -145,7 +131,7 @@ def _host_sort_key(device: dict) -> list[int]:
 
 async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
     """List configured devices with their MAC, flagging which are safe to block."""
-    arp = await hass.async_add_executor_job(_read_arp_table)
+    arp = await hass.async_add_executor_job(arp_table)
     entries = hass.config_entries.async_entries(DOMAIN)
     gateways = {
         entry.data.get(CONF_DEVICE_ID)
