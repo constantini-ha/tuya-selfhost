@@ -12,8 +12,12 @@ It assumes you already have:
 - An Alexa Smart Home skill with its AWS Lambda function and account linking
   already working
 
-Setting the skill up is covered by the [Home Assistant Alexa
-documentation](https://www.home-assistant.io/integrations/alexa.smart_home/).
+Don't have them yet? [Building the Alexa skill from scratch](ALEXA_SKILL.md)
+walks through the skill, the Lambda (with the code) and account linking, then
+hands you back here. The [Home Assistant Alexa
+documentation](https://www.home-assistant.io/integrations/alexa.smart_home/) is
+the canonical reference for that part.
+
 What follows is only the part that touches your devices.
 
 ## 1. Generate the configuration

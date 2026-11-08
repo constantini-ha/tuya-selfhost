@@ -1,3 +1,5 @@
+import { t } from "./i18n.js";
+
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
 
@@ -19,6 +21,9 @@ const STYLE = `
 .bar button.menu { border:none; background:transparent; color:inherit; cursor:pointer;
   padding:8px; border-radius:50%; display:flex; line-height:0 }
 .bar button.menu:hover { background:rgba(127,127,127,.18) }
+button.icon { border:none; background:transparent; color:var(--secondary-text-color);
+  cursor:pointer; padding:6px; border-radius:50%; display:flex; --mdc-icon-size:22px }
+button.icon:hover { background:rgba(127,127,127,.18) }
 .wrap { padding:16px; max-width:920px; margin:0 auto }
 ha-card { margin-bottom:16px; overflow:hidden }
 .pad { padding:16px }
@@ -101,6 +106,25 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .banner { margin:14px 0 0; padding:12px 14px; border-radius:10px; font-size:13px;
   background:var(--primary-color); color:var(--text-primary-color) }
 .banner button { margin:10px 6px 0 0 }
+.tabs { display:flex; gap:4px; padding:0 8px; border-bottom:1px solid var(--divider-color);
+  overflow-x:auto }
+.tab { appearance:none; border:0; background:none; cursor:pointer; font:inherit; font-size:14px;
+  padding:14px 12px; color:var(--secondary-text-color); border-bottom:2px solid transparent;
+  white-space:nowrap }
+.tab[aria-selected="true"] { color:var(--primary-color); border-bottom-color:var(--primary-color) }
+.block { padding:16px; border-bottom:1px solid var(--divider-color) }
+.block:last-child { border-bottom:0 }
+.block h3 { margin:0 0 6px; font-size:15px; font-weight:500 }
+.net { display:flex; align-items:center; gap:12px; padding:10px 0;
+  border-bottom:1px solid var(--divider-color) }
+.net:last-child { border-bottom:0 }
+.mono { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px }
+pre.mono { margin:0; padding:12px; border-radius:10px; overflow:auto; max-height:260px;
+  background:var(--code-editor-background-color,rgba(127,127,127,.12)) }
+a.link { color:var(--primary-color); text-decoration:none; font-size:14px }
+a.link:hover { text-decoration:underline }
+ol.steps { margin:8px 0 0; padding-left:20px; font-size:13.5px; line-height:1.7;
+  color:var(--secondary-text-color) }
 `;
 
 class TuyaSelfhostPanel extends HTMLElement {
@@ -115,6 +139,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._screen = "";
     this._editing = false;
     this._ready = false;
+    this._config = null;     // active panel-settings tab, null when closed
+  }
+
+  _t(key, vars) {
+    return t(this._hass, key, vars);
   }
 
   set narrow(value) {
@@ -258,7 +287,7 @@ class TuyaSelfhostPanel extends HTMLElement {
   async _learn(index) {
     const control = this._control();
     const button = control.buttons[index];
-    this._busy = `Aponte o controle para o aparelho e aperte "${button.name}". 30 segundos.`;
+    this._busy = this._t("learning", { name: button.name });
     this._render();
     try {
       await this._hass.callService("remote", "learn_command", {
@@ -272,7 +301,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._confirm = index;
     } catch (err) {
       this._busy = null;
-      this._flash = `Não capturei nada: ${err.message || err}`;
+      this._flash = this._t("nothing_captured", { err: err.message || err });
     }
     this._render();
   }
@@ -289,7 +318,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         command: button.command,
       });
     } catch (err) {
-      this._flash = `Falhou: ${err.message || err}`;
+      this._flash = this._t("send_failed", { err: err.message || err });
       this._render();
     }
   }
@@ -305,7 +334,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     button.taught = false;
     await this._save(this._remoteOf(this._entry()));
     this._confirm = null;
-    this._flash = "Código descartado. Pode aprender de novo.";
+    this._flash = this._t("discarded");
     this._render();
   }
 
@@ -321,7 +350,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (view.sections) view.sections.push({ type: "grid", cards: [card] });
     else (view.cards ||= []).push(card);
     await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
-    this._flash = `"${entry.title}" foi para o seu painel.`;
+    this._flash = this._t("sent_to_dashboard", { name: entry.title });
     this._render();
   }
 
@@ -338,7 +367,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (view.sections) view.sections.push({ type: "grid", cards: [card] });
     else (view.cards ||= []).push(card);
     await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
-    this._flash = `"${control.name}" foi para o seu painel.`;
+    this._flash = this._t("sent_to_dashboard", { name: control.name });
     this._render();
   }
 
@@ -361,7 +390,18 @@ class TuyaSelfhostPanel extends HTMLElement {
     );
     const title = document.createElement("h1");
     title.textContent = "Tuya Selfhost";
-    bar.append(menu, title);
+    const gear = document.createElement("button");
+    gear.className = "menu";
+    gear.style.marginLeft = "auto";
+    gear.title = this._t("settings");
+    gear.innerHTML = `<ha-icon icon="mdi:cog-outline"></ha-icon>`;
+    gear.addEventListener("click", () => {
+      this._config = this._config ? null : "add";
+      this._open = null;
+      this._remote = null;
+      this._render();
+    });
+    bar.append(menu, title, gear);
     root.appendChild(bar);
 
     const wrap = document.createElement("div");
@@ -376,8 +416,14 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._flash = null;
     }
 
+    if (this._config) {
+      wrap.appendChild(this._renderSettings());
+      this._paint(root);
+      return;
+    }
+
     if (!this._entries || !this._entries.length) {
-      wrap.innerHTML += `<ha-card><div class="pad">Nenhum aparelho Tuya Selfhost configurado ainda.</div></ha-card>`;
+      wrap.innerHTML += `<ha-card><div class="pad">${this._t("no_devices")}</div></ha-card>`;
     } else if (this._remote) {
       wrap.appendChild(this._renderRemote());
     } else if (this._open) {
@@ -389,9 +435,250 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._paint(root);
   }
 
+  _navigate(path) {
+    history.pushState(null, "", path);
+    window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+  }
+
+  async _copy(text, label) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      const area = document.createElement("textarea");
+      area.value = text;
+      this.shadowRoot.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    this._flash = label;
+    this._render();
+  }
+
+  async _loadReport() {
+    this._report = "loading";
+    try {
+      const result = await this._hass.callService(
+        "tuya_selfhost", "network_report", {}, undefined, false, true
+      );
+      this._report = (result && result.response && result.response.devices) || [];
+    } catch (err) {
+      this._report = [];
+    }
+    this._render();
+  }
+
+  async _alexaLoad() {
+    this._alexa = "loading";
+    try {
+      const result = await this._hass.callService(
+        "tuya_selfhost", "alexa_config", {}, undefined, false, true
+      );
+      this._alexa = (result && result.response) || null;
+    } catch (err) {
+      this._alexa = null;
+    }
+    this._render();
+  }
+
+  _renderSettings() {
+    const card = document.createElement("ha-card");
+    card.header = this._t("settings_title");
+
+    const back = document.createElement("button");
+    back.className = "act ghost";
+    back.style.margin = "0 8px 8px";
+    back.textContent = this._t("back_devices");
+    back.addEventListener("click", () => {
+      this._config = null;
+      this._render();
+    });
+    card.appendChild(back);
+
+    const tabs = document.createElement("div");
+    tabs.className = "tabs";
+    for (const [id, key] of [
+      ["add", "tab_add"],
+      ["network", "tab_network"],
+      ["alexa", "tab_alexa"],
+    ]) {
+      const tab = document.createElement("button");
+      tab.className = "tab";
+      tab.setAttribute("aria-selected", String(this._config === id));
+      tab.textContent = this._t(key);
+      tab.addEventListener("click", () => {
+        this._config = id;
+        this._render();
+      });
+      tabs.appendChild(tab);
+    }
+    card.appendChild(tabs);
+
+    if (this._config === "network") card.appendChild(this._tabNetwork());
+    else if (this._config === "alexa") card.appendChild(this._tabAlexa());
+    else card.appendChild(this._tabAdd());
+    return card;
+  }
+
+  _tabAdd() {
+    const box = document.createElement("div");
+    const intro = document.createElement("div");
+    intro.className = "block";
+    intro.innerHTML = `<div class="muted">${this._t("add_intro")}</div>`;
+    box.appendChild(intro);
+
+    const start = document.createElement("div");
+    start.className = "block";
+    start.innerHTML = `<h3>${this._t("add_cloud")}</h3>
+      <div class="muted">${this._t("add_cloud_text")}</div>
+      <h3 style="margin-top:16px">${this._t("add_local")}</h3>
+      <div class="muted">${this._t("add_local_text")}</div>
+      <div class="muted" style="margin-top:14px">${this._t("add_which")}</div>`;
+    const go = document.createElement("button");
+    go.className = "act";
+    go.style.marginTop = "14px";
+    go.textContent = this._t("open_flow");
+    go.addEventListener("click", () =>
+      this._navigate("/config/integrations/dashboard/add?domain=tuya_selfhost")
+    );
+    start.appendChild(go);
+    box.appendChild(start);
+
+    const list = document.createElement("div");
+    list.className = "block";
+    list.innerHTML = `<h3>${this._t("manage_entries")}</h3>
+      <div class="muted">${this._t("devices_count", {
+        n: (this._entries || []).length,
+      })}</div>`;
+    const open = document.createElement("button");
+    open.className = "act ghost";
+    open.style.marginTop = "10px";
+    open.textContent = this._t("manage_link");
+    open.addEventListener("click", () =>
+      this._navigate("/config/integrations/integration/tuya_selfhost")
+    );
+    list.appendChild(open);
+    box.appendChild(list);
+    return box;
+  }
+
+  _tabNetwork() {
+    const box = document.createElement("div");
+    const head = document.createElement("div");
+    head.className = "block";
+    head.innerHTML = `<h3>${this._t("network_title")}</h3>
+      <div class="muted">${this._t("network_intro")}</div>`;
+    box.appendChild(head);
+
+    if (this._report === undefined) {
+      this._report = "loading";
+      setTimeout(() => this._loadReport(), 0);
+    }
+    const body = document.createElement("div");
+    body.className = "block";
+    if (this._report === "loading" || this._report === undefined) {
+      body.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
+      box.appendChild(body);
+      return box;
+    }
+
+    for (const device of this._report) {
+      const row = document.createElement("div");
+      row.className = "net";
+      const pill = device.block_recommended ? "on" : "";
+      row.innerHTML = `
+        <div class="grow">
+          <div>${device.name}</div>
+          <div class="muted mono">${device.host || "—"} · ${
+            device.mac || this._t("no_mac")
+          }</div>
+        </div>
+        <span class="pill ${pill}">${
+          device.block_recommended ? this._t("block_yes") : this._t("block_no")
+        }</span>`;
+      body.appendChild(row);
+    }
+    box.appendChild(body);
+
+    const foot = document.createElement("div");
+    foot.className = "block";
+    foot.innerHTML = `<div class="muted">${this._t("mac_hint")}</div>`;
+    const macs = this._report
+      .filter((d) => d.block_recommended && d.mac)
+      .map((d) => `${d.mac}  ${d.name}`)
+      .join("\n");
+    const copy = document.createElement("button");
+    copy.className = "act";
+    copy.style.margin = "10px 8px 0 0";
+    copy.textContent = this._t("copy_macs");
+    copy.disabled = !macs;
+    copy.addEventListener("click", () => this._copy(macs, this._t("copied")));
+    const again = document.createElement("button");
+    again.className = "act ghost";
+    again.textContent = this._t("refresh");
+    again.addEventListener("click", () => {
+      this._report = undefined;
+      this._render();
+    });
+    foot.append(copy, again);
+    box.appendChild(foot);
+    return box;
+  }
+
+  _tabAlexa() {
+    const box = document.createElement("div");
+    const head = document.createElement("div");
+    head.className = "block";
+    head.innerHTML = `<div class="muted">${this._t("alexa_intro")}</div>
+      <ol class="steps">${["alexa_s1", "alexa_s2", "alexa_s3", "alexa_s4", "alexa_s5"]
+        .map((k) => `<li>${this._t(k)}</li>`)
+        .join("")}</ol>`;
+    box.appendChild(head);
+
+    if (this._alexa === undefined) {
+      this._alexa = "loading";
+      setTimeout(() => this._alexaLoad(), 0);
+    }
+    const body = document.createElement("div");
+    body.className = "block";
+    if (this._alexa === "loading" || this._alexa === undefined) {
+      body.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
+      box.appendChild(body);
+      return box;
+    }
+    const yaml = (this._alexa && this._alexa.yaml) || "";
+    body.innerHTML = `<h3>${this._t("alexa_yaml")}</h3>
+      <div class="muted" style="margin-bottom:10px">${this._t("alexa_count", {
+        n: (this._alexa && this._alexa.entity_count) || 0,
+      })}</div>
+      <pre class="mono">${yaml.replace(/</g, "&lt;")}</pre>`;
+    const copy = document.createElement("button");
+    copy.className = "act";
+    copy.style.marginTop = "10px";
+    copy.textContent = this._t("copy_yaml");
+    copy.addEventListener("click", () => this._copy(yaml, this._t("copied")));
+    body.appendChild(copy);
+    box.appendChild(body);
+
+    const keys = document.createElement("div");
+    keys.className = "block";
+    keys.innerHTML = `<h3>${this._t("keys_title")}</h3>
+      <div class="muted">${this._t("keys_text")}</div>`;
+    box.appendChild(keys);
+
+    const guide = document.createElement("div");
+    guide.className = "block";
+    guide.innerHTML = `<h3>${this._t("guide_title")}</h3>
+      <a class="link" href="${this._t("guide_url")}" target="_blank" rel="noreferrer">${this._t(
+        "guide_link"
+      )}</a>`;
+    box.appendChild(guide);
+    return box;
+  }
+
   _renderList() {
     const card = document.createElement("ha-card");
-    card.header = "Seus aparelhos";
+    card.header = this._t("devices");
     for (const entry of this._entries) {
       const entities = this._byEntry[entry.entry_id] || [];
       const remote = this._remoteOf(entry);
@@ -402,15 +689,18 @@ class TuyaSelfhostPanel extends HTMLElement {
         <ha-icon icon="${remote ? "mdi:remote" : "mdi:power-socket-eu"}"></ha-icon>
         <div class="grow">
           <div>${entry.title}</div>
-          <div class="muted">${entities.length} entidades${
-            remote ? ` · ${controls} controle${controls === 1 ? "" : "s"}` : ""
+          <div class="muted">${this._t("entities", { n: entities.length })}${
+            remote
+              ? " · " + this._t(controls === 1 ? "control" : "controls", { n: controls })
+              : ""
           }</div>
         </div>
-        ${remote ? '<span class="pill on">emissor IR/RF</span>' : ""}`;
+        ${remote ? `<span class="pill on">${this._t("emitter")}</span>` : ""}`;
       row.style.cursor = "pointer";
       row.addEventListener("click", () => {
         this._open = entry.entry_id;
         this._settings = false;
+        this._config = null;
         this._render();
       });
       row.insertAdjacentHTML(
@@ -432,7 +722,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     head.className = "pad row";
     const back = document.createElement("button");
     back.className = "act ghost";
-    back.textContent = this._settings ? "← Voltar" : "← Aparelhos";
+    back.textContent = this._t(this._settings ? "back" : "back_devices");
     back.addEventListener("click", () => {
       if (this._settings) this._settings = false;
       else this._open = null;
@@ -440,6 +730,17 @@ class TuyaSelfhostPanel extends HTMLElement {
     });
     head.appendChild(back);
     head.appendChild(Object.assign(document.createElement("span"), { className: "grow" }));
+    if (!this._settings) {
+      const cog = document.createElement("button");
+      cog.className = "icon";
+      cog.title = this._t("settings");
+      cog.innerHTML = `<ha-icon icon="mdi:cog-outline"></ha-icon>`;
+      cog.addEventListener("click", () => {
+        this._settings = true;
+        this._render();
+      });
+      head.appendChild(cog);
+    }
     card.appendChild(head);
 
     const entities = this._byEntry[entry.entry_id] || [];
@@ -452,7 +753,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       const title = document.createElement("div");
       title.className = "muted";
       title.style.marginBottom = "4px";
-      title.textContent = "Configurações";
+      title.textContent = this._t("settings");
       list.appendChild(title);
       for (const item of this._sorted(rest.length ? rest : entities)) {
         list.appendChild(this._entityRow(item));
@@ -500,32 +801,26 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (gangs.length) {
       const ids = gangs.map((e) => e.entity_id);
       actions.append(
-        action("mdi:flash", "Ligar tudo", () =>
+        action("mdi:flash", this._t("all_on"), () =>
           this._hass.callService("homeassistant", "turn_on", { entity_id: ids })
         ),
-        action("mdi:flash-off", "Desligar tudo", () =>
+        action("mdi:flash-off", this._t("all_off"), () =>
           this._hass.callService("homeassistant", "turn_off", { entity_id: ids })
         )
       );
     }
-    actions.append(
-      action("mdi:cog-outline", "Configurações", () => {
-        this._settings = true;
-        this._render();
-      })
-    );
     if (gangs.length) {
       actions.append(
-        action("mdi:view-dashboard-outline", "Ao painel", () => this._deviceToDashboard())
+        action("mdi:view-dashboard-outline", this._t("to_dashboard"), () => this._deviceToDashboard())
       );
     }
-    card.appendChild(actions);
+    if (actions.children.length) card.appendChild(actions);
 
     if (remote) {
       const section = document.createElement("div");
       section.className = "pad";
       section.style.borderTop = "1px solid var(--divider-color)";
-      section.innerHTML = `<div class="muted" style="margin-bottom:10px">Controles deste emissor</div>`;
+      section.innerHTML = `<div class="muted" style="margin-bottom:10px">${this._t("remote_controls")}</div>`;
       for (const control of this._controls(remote)) {
         const taught = control.buttons.filter((b) => b.taught).length;
         const row = document.createElement("div");
@@ -533,25 +828,51 @@ class TuyaSelfhostPanel extends HTMLElement {
         row.style.padding = "6px 0";
         row.innerHTML = `<ha-icon icon="mdi:remote-tv"></ha-icon>
           <div class="grow"><div>${control.name}</div>
-          <div class="muted">${control.buttons.length} botões · ${taught} aprendidos</div></div>`;
+          <div class="muted">${this._t("buttons_taught", { n: control.buttons.length, t: taught })}</div></div>`;
         row.style.cursor = "pointer";
         row.addEventListener("click", (ev) => {
           if (ev.target.closest("button")) return;
+          if (this._confirmControl === control.id) return;
           this._remote = control.id;
           this._render();
         });
         const open = document.createElement("button");
         open.className = "act";
-        open.textContent = "Abrir";
+        open.textContent = this._t("open");
         open.addEventListener("click", () => {
           this._remote = control.id;
           this._render();
         });
         const del = document.createElement("button");
         del.className = "act ghost";
-        del.textContent = "Excluir";
-        del.addEventListener("click", () => this._removeControl(remote, control.id));
-        row.append(open, del);
+        if (this._confirmControl === control.id) {
+          del.className = "act warn";
+          del.textContent = this._t("yes");
+          del.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            this._confirmControl = null;
+            this._removeControl(remote, control.id);
+          });
+          const cancel = document.createElement("button");
+          cancel.className = "act ghost";
+          cancel.textContent = this._t("no");
+          cancel.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            this._confirmControl = null;
+            this._render();
+          });
+          row.querySelector(".grow").innerHTML =
+            `<div class="muted">${this._t("confirm_delete_control", { name: control.name })}</div>`;
+          row.append(del, cancel);
+        } else {
+          del.textContent = this._t("delete");
+          del.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            this._confirmControl = control.id;
+            this._render();
+          });
+          row.append(open, del);
+        }
         section.appendChild(row);
       }
       const form = document.createElement("div");
@@ -559,10 +880,10 @@ class TuyaSelfhostPanel extends HTMLElement {
       form.style.marginTop = "10px";
       const name = document.createElement("input");
       name.className = "grow";
-      name.placeholder = "Nome do controle (ex.: Ar da sala)";
+      name.placeholder = this._t("new_control");
       const add = document.createElement("button");
       add.className = "act";
-      add.textContent = "Criar controle";
+      add.textContent = this._t("create_control");
       add.addEventListener("click", () => {
         if (name.value.trim()) this._addControl(remote, name.value.trim());
       });
@@ -666,7 +987,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     head.className = "pad row";
     const back = document.createElement("button");
     back.className = "act ghost";
-    back.textContent = "← Voltar";
+    back.textContent = this._t("back");
     back.addEventListener("click", () => {
       this._remote = null;
       this._confirm = null;
@@ -674,7 +995,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     });
     const edit = document.createElement("button");
     edit.className = this._editing ? "act" : "act ghost";
-    edit.textContent = this._editing ? "Concluir" : "Editar";
+    edit.textContent = this._t(this._editing ? "done" : "edit");
     edit.addEventListener("click", () => {
       this._editing = !this._editing;
       this._render();
@@ -717,10 +1038,13 @@ class TuyaSelfhostPanel extends HTMLElement {
         return b;
       };
       tools.append(
-        mk("←", "Mover", () => this._moveButton(index, -1)),
-        mk("→", "Mover", () => this._moveButton(index, 1)),
-        mk("⟳", "Regravar", () => this._learn(index)),
-        mk("✕", "Excluir", () => this._deleteButton(index))
+        mk("←", "", () => this._moveButton(index, -1)),
+        mk("→", "", () => this._moveButton(index, 1)),
+        mk("⟳", this._t("edit"), () => this._learn(index)),
+        mk("✕", this._t("delete"), () => {
+          this._confirmButton = index;
+          this._render();
+        })
       );
       slot.appendChild(tools);
       keys.appendChild(slot);
@@ -736,27 +1060,53 @@ class TuyaSelfhostPanel extends HTMLElement {
       card.appendChild(b);
     }
 
+    if (this._confirmButton !== null && this._confirmButton !== undefined) {
+      const index = this._confirmButton;
+      const button = control.buttons[index];
+      const box = document.createElement("div");
+      box.className = "banner";
+      box.style.margin = "16px";
+      box.innerHTML = `<div>${this._t("confirm_delete_button", { name: button.name })}</div>`;
+      const sim = document.createElement("button");
+      sim.className = "act warn";
+      sim.textContent = this._t("yes");
+      sim.addEventListener("click", () => {
+        this._confirmButton = null;
+        this._deleteButton(index);
+      });
+      const nao = document.createElement("button");
+      nao.className = "act ghost";
+      nao.style.color = "inherit";
+      nao.textContent = this._t("no");
+      nao.addEventListener("click", () => {
+        this._confirmButton = null;
+        this._render();
+      });
+      box.append(sim, nao);
+      card.appendChild(box);
+    }
+
     if (this._confirm !== null && this._confirm !== undefined) {
       const index = this._confirm;
       const box = document.createElement("div");
       box.className = "banner";
       box.style.margin = "16px";
-      box.innerHTML = `<div>Capturado. Testar antes de manter?</div>`;
+      box.innerHTML = `<div>${this._t("captured")}</div>`;
       const test = document.createElement("button");
       test.className = "act ghost";
       test.style.color = "inherit";
-      test.textContent = "Testar";
+      test.textContent = this._t("test");
       test.addEventListener("click", () => this._press(index));
       const keep = document.createElement("button");
       keep.className = "act";
-      keep.textContent = "Manter";
+      keep.textContent = this._t("keep");
       keep.addEventListener("click", () => {
         this._confirm = null;
         this._render();
       });
       const drop = document.createElement("button");
       drop.className = "act warn";
-      drop.textContent = "Descartar";
+      drop.textContent = this._t("discard");
       drop.addEventListener("click", () => this._discard(index));
       box.append(test, keep, drop);
       card.appendChild(box);
@@ -766,7 +1116,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     actions.className = "pad row";
     const dash = document.createElement("button");
     dash.className = "act";
-    dash.textContent = "Adicionar ao painel";
+    dash.textContent = this._t("add_to_dashboard");
     dash.disabled = !control.buttons.some((b) => b.taught);
     dash.addEventListener("click", () => this._toDashboard());
     actions.append(dash);
@@ -775,7 +1125,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       for (const n of [2, 3, 4]) {
         const o = document.createElement("option");
         o.value = String(n);
-        o.textContent = `${n} colunas`;
+        o.textContent = this._t("columns", { n });
         o.selected = (control.columns || 3) === n;
         columns.appendChild(o);
       }
@@ -791,9 +1141,9 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (!this._editing) {
       const hint = document.createElement("div");
       hint.className = "pad muted";
-      hint.textContent = control.buttons.some((b) => !b.taught)
-        ? "Teclas apagadas ainda não têm código: toque numa delas para aprender."
-        : "Toque numa tecla para enviar. Em Editar você acrescenta, move e regrava.";
+      hint.textContent = this._t(
+        control.buttons.some((b) => !b.taught) ? "hint_untaught" : "hint_taught"
+      );
       card.appendChild(hint);
       return card;
     }
@@ -802,7 +1152,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     form.className = "pad row";
     const name = document.createElement("input");
     name.className = "grow";
-    name.placeholder = "Nome do botão (ex.: Frio 22)";
+    name.placeholder = this._t("button_name");
     const icon = document.createElement("select");
     for (const i of ICONS) {
       const o = document.createElement("option");
@@ -812,7 +1162,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     const add = document.createElement("button");
     add.className = "act";
-    add.textContent = "+ Botão";
+    add.textContent = this._t("add_button");
     add.addEventListener("click", () => {
       if (name.value.trim()) this._addButton(name.value.trim(), icon.value);
     });
@@ -821,10 +1171,7 @@ class TuyaSelfhostPanel extends HTMLElement {
 
     const tip = document.createElement("div");
     tip.className = "pad muted";
-    tip.textContent =
-      "Tecla apagada ainda não tem código: toque para aprender. Tecla acesa envia. " +
-      "Deixe o controle físico no estado exato antes de apertar — controle de ar " +
-      "transmite o estado inteiro a cada toque.";
+    tip.textContent = this._t("hint_edit");
     card.appendChild(tip);
     return card;
   }

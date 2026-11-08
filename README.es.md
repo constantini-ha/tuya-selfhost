@@ -84,11 +84,11 @@ configuración nueva es solo un YAML, documentado en
 
 ## Constructor de mandos IR y RF
 
-Abre **Controles Tuya** en la barra lateral. ¿Ninguna integración de protocolo
+Abre **Tuya Selfhost** en la barra lateral. ¿Ninguna integración de protocolo
 funciona con tu aire acondicionado? Copia el mando de verdad.
 
 ```
-  Controles Tuya                                   [Añadir al panel]
+  Tuya Selfhost                                   [Añadir al panel]
   ┌────────────┬────────────┬────────────┐
   │  ❄ Frío 22 │  ⏻ Apagar  │     +      │   toque sin código  → aprende
   │  aprendido │  aprendido │            │   toque con código  → prueba

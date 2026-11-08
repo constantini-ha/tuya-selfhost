@@ -8,6 +8,7 @@ from homeassistant.components import panel_custom, websocket_api
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
@@ -23,6 +24,7 @@ FRONTEND_URL = f"/{DOMAIN}/frontend"
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_remote_layouts"
 READY_FLAG = f"{DOMAIN}_remote_card"
+SIGNAL_LAYOUTS = f"{DOMAIN}_layouts_changed"
 DEFAULT_LAYOUT = {"columns": 3, "buttons": []}
 
 
@@ -91,4 +93,5 @@ async def websocket_set_layout(hass, connection, msg):
     stored = await store.async_load() or {}
     stored[msg["key"]] = msg["layout"]
     await store.async_save(stored)
+    async_dispatcher_send(hass, SIGNAL_LAYOUTS)
     connection.send_result(msg["id"], {"saved": True})

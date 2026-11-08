@@ -83,11 +83,11 @@ configuração nova é só um YAML, documentado em
 
 ## Construtor de controles IR e RF
 
-Abra **Controles Tuya** na barra lateral. Nenhuma integração de protocolo funciona
+Abra **Tuya Selfhost** na barra lateral. Nenhuma integração de protocolo funciona
 com o seu ar-condicionado? Copie o controle de verdade.
 
 ```
-  Controles Tuya                                   [Adicionar ao painel]
+  Tuya Selfhost                                   [Adicionar ao painel]
   ┌────────────┬────────────┬────────────┐
   │  ❄ Frio 22 │  ⏻ Desligar│     +      │   toque sem código  → aprende
   │  aprendido │  aprendido │            │   toque com código  → testa

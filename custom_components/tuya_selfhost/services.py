@@ -21,6 +21,7 @@ from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .helpers.arp import arp_table
 from .infrared import TuyaRemoteCommand
 from .remote import FLAG_SAVE_DELAY, TuyaLocalRemote
+from .remote_keys import OBJECT_ID_PREFIX
 
 REMOTE_SEND_IR_COMMAND_SCHEMA = {
     vol.Required("emitter_entity_id"): cv.entity_id,
@@ -63,6 +64,7 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
 ALEXA_DOMAINS = frozenset(
     {
         "binary_sensor",
+        "button",
         "climate",
         "cover",
         "fan",
@@ -91,12 +93,17 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
             if item.disabled_by or item.hidden_by or item.domain not in ALEXA_DOMAINS:
                 continue
             state = hass.states.get(item.entity_id)
-            name = (
-                (state.attributes.get("friendly_name") if state else None)
-                or item.name
-                or item.original_name
-                or item.entity_id
-            )
+            if item.entity_id.startswith(f"button.{OBJECT_ID_PREFIX}_"):
+                # A remote key is already named "<remote> <key>"; the device name
+                # Home Assistant prepends would make it unspeakable.
+                name = item.name or item.original_name or item.entity_id
+            else:
+                name = (
+                    (state.attributes.get("friendly_name") if state else None)
+                    or item.name
+                    or item.original_name
+                    or item.entity_id
+                )
             entities.append((item.entity_id, str(name)))
     entities.sort()
 
@@ -111,6 +118,10 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
         "    # client_id: !secret alexa_client_id",
         "    # client_secret: !secret alexa_client_secret",
         "    filter:",
+        "      # Every remote key lands under this prefix, so keys learned later",
+        "      # are already covered: Alexa only has to discover devices again.",
+        "      include_entity_globs:",
+        f"        - button.{OBJECT_ID_PREFIX}_*",
         "      include_entities:",
     ]
     lines += [f"        - {entity_id}" for entity_id, _ in entities]

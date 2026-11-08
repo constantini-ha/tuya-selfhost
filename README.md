@@ -83,11 +83,11 @@ one is just a YAML file, documented in
 
 ## IR and RF remote builder
 
-Open **Controles Tuya** in the sidebar. No protocol integration works with your
+Open **Tuya Selfhost** in the sidebar. No protocol integration works with your
 air conditioner? Copy the real remote instead.
 
 ```
-  Controles Tuya                                  [Add to dashboard]
+  Tuya Selfhost                                  [Add to dashboard]
   ┌────────────┬────────────┬────────────┐
   │  ❄ Cool 22 │  ⏻ Off     │     +      │   tap without a code → learn
   │  learned   │  learned   │            │   tap with a code    → test

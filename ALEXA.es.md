@@ -12,9 +12,13 @@ Da por hecho que ya tienes:
 - Una skill Alexa Smart Home con su función AWS Lambda y la vinculación de
   cuenta ya funcionando
 
-Montar la skill está en la [documentación de Alexa en Home
-Assistant](https://www.home-assistant.io/integrations/alexa.smart_home/). Aquí
-solo cubrimos la parte que toca tus dispositivos.
+¿Aún no los tienes? [Montando la skill de Alexa desde cero](ALEXA_SKILL.es.md)
+recorre la skill, la Lambda (con el código) y la vinculación de cuenta, y te
+devuelve aquí. La [documentación de Alexa en Home
+Assistant](https://www.home-assistant.io/integrations/alexa.smart_home/) es la
+referencia oficial de esa parte.
+
+Aquí solo cubrimos la parte que toca tus dispositivos.
 
 ## 1. Genera la configuración
 

@@ -9,9 +9,9 @@ ventiladores de marcas locales no lo hacen, y ninguna configuración lo cambia.
 La salida es dejar de adivinar el protocolo y copiar la señal: enseñarle al
 blaster tu mando físico y después repetir lo que grabó.
 
-## La vía fácil: la página Controles Tuya
+## La vía fácil: el panel Tuya Selfhost
 
-La integración incluye un constructor. Abre **Controles Tuya** en la barra lateral,
+La integración incluye un constructor. Abre **Tuya Selfhost** en la barra lateral,
 crea un mando, añade botones con nombre e icono, y enséñalos uno a uno. Cada
 captura ofrece **Probar / Conservar / Descartar**, así que una lectura mala nunca
 reemplaza en silencio a una buena, y las flechas bajo cada botón fijan su posición.
@@ -133,3 +133,27 @@ Los códigos aprendidos se guardan por device id. Si vuelves a emparejar el
 blaster en la app de Tuya obtiene un id nuevo, lo que hasta ahora dejaba
 huérfanos todos los códigos enseñados. Usa **Reconfigurar** en la entrada en
 lugar de borrarla y los códigos viajan con ella.
+
+## Pulsar una tecla por voz
+
+Cada tecla que enseñas se convierte también en una entidad `button`, llamada
+`<mando> <tecla>` y agrupada en el emisor. Eso es lo que la pone al alcance de
+una automatización, un script o un asistente de voz.
+
+Alexa trata un botón como una escena, así que la orden es *enciende*:
+
+> "Alexa, enciende Aire del salón Frío 22"
+
+El bloque que genera la acción **configuración de Alexa** ya trae un comodín que
+cubre todas las teclas, las de hoy y las de mañana, así que nunca tienes que
+volver a generarlo después de enseñar una más. Lo que sí tienes que hacer es
+dejar que Alexa la encuentre:
+
+> "Alexa, detecta dispositivos"
+
+Una skill propia no se entera de una entidad nueva por su cuenta — eso solo lo
+tiene quien paga Nabu Casa. Un descubrimiento después de crear las teclas es
+todo el coste.
+
+[Exponiendo tus dispositivos a Alexa](ALEXA.es.md) cubre el resto, y
+[Montando la skill de Alexa desde cero](ALEXA_SKILL.es.md) cubre la skill en sí.

@@ -1,3 +1,5 @@
+import { t, tn } from "./i18n.js";
+
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 
 const STYLE = `
@@ -55,7 +57,8 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
   _render() {
     const control = this._control;
     const card = document.createElement("ha-card");
-    card.header = this._config.title || (control && control.name) || "Controle";
+    card.header =
+      this._config.title || (control && control.name) || t(this.hass, "control_fallback");
 
     if (this._error) {
       card.innerHTML = `<div class="empty">Não consegui ler o controle: ${this._error}</div>`;
@@ -121,6 +124,6 @@ customElements.define("tuya-selfhost-remote-card", TuyaSelfhostRemoteCard);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "tuya-selfhost-remote-card",
-  name: "Controle Tuya Selfhost",
-  description: "Botões de um controle montado na página Controles Tuya",
+  name: tn("card_name"),
+  description: tn("card_desc"),
 });

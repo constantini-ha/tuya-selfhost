@@ -1,3 +1,5 @@
+import { t, tn } from "./i18n.js";
+
 const STYLE = `
   .pad { padding:16px }
   .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:4px 16px 0 }
@@ -129,10 +131,12 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
   _summary() {
     const states = (this._gangs || []).map((id) => (this._hass.states[id] || {}).state);
     if (!states.length) return "";
-    if (states.every((s) => s === "unavailable")) return "O aparelho está offline";
+    if (states.every((s) => s === "unavailable")) return t(this.hass, "offline");
     const on = states.filter((s) => s === "on").length;
-    if (!on) return "Tudo desligado";
-    return on === states.length ? "Tudo ligado" : `${on} de ${states.length} ligadas`;
+    if (!on) return t(this.hass, "all_off_state");
+    return on === states.length
+      ? t(this.hass, "all_on_state")
+      : t(this.hass, "some_on", { n: on, total: states.length });
   }
 
   _render() {
@@ -171,7 +175,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         this._hass.callService("homeassistant", anyOn ? "turn_off" : "turn_on", {
           entity_id: this._gangs,
         }),
-        anyOn ? "Desligar tudo" : "Ligar tudo"
+        anyOn ? t(this.hass, "all_off") : t(this.hass, "all_on")
       );
       // with a key of its own per gang, the all-at-once button is a secondary action
       if (this._gangs.length > 1) geral.classList.add("small");
@@ -263,13 +267,13 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         return b;
       };
       actions.append(
-        action("mdi:flash", "Ligar tudo", () =>
+        action("mdi:flash", t(this.hass, "all_on"), () =>
           this._hass.callService("homeassistant", "turn_on", { entity_id: this._gangs })
         ),
-        action("mdi:flash-off", "Desligar tudo", () =>
+        action("mdi:flash-off", t(this.hass, "all_off"), () =>
           this._hass.callService("homeassistant", "turn_off", { entity_id: this._gangs })
         ),
-        action("mdi:cog-outline", "Abrir", () => {
+        action("mdi:cog-outline", t(this.hass, "settings"), () => {
           history.pushState(null, "", "/tuya-selfhost");
           window.dispatchEvent(new CustomEvent("location-changed"));
         })
@@ -294,6 +298,6 @@ customElements.define("tuya-selfhost-device-card", TuyaSelfhostDeviceCard);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "tuya-selfhost-device-card",
-  name: "Aparelho Tuya Selfhost",
-  description: "As teclas de um interruptor, desenhadas como teclas",
+  name: tn("device_card_name"),
+  description: tn("device_card_desc"),
 });

@@ -17,12 +17,12 @@ export PATH="$HOME/.local/bin:$PATH"
 - Python files should be checked with `uv run ruff check`, `uv run ruff check --select -I`
 - Python files should be formatted consistently with `uv run ruff format`
 - YAML files for device configuration should be checked with `uv run yamllint`
-- YAML files for device configuration must be located in the custom_components/tuya_local/devices folder
-- Python files implementing the HA integration must be located in custom_components/tuya_local and its subfolders, with unit tests in tests and its subfolders.
-- JSON files for translations are located in the custom_components/tuya_local/translations folder.
-- Icons for translation keys are defined in custom_components/tuya_local/icons.json, and use icons from the material design icons at https://pictogrammers.com/library/mdi/
-- Where possible, new devices should use existing translation_keys which are present in custom_components/tuya_local/translations/*.json and custom/components/tuya_local/icons.json
-- if new translation_keys are added, they should be generic, not device specific, and translations in the appropriate language should be added to all files in custom_components/tuya_local/translations and relevant icons to custom_components/tuya_local/icons.json. It is best to submit additional translations as a separate PR request from new device submissions, as they can involve a lot of rework to existing configs.
+- YAML files for device configuration must be located in the custom_components/tuya_selfhost/devices folder
+- Python files implementing the HA integration must be located in custom_components/tuya_selfhost and its subfolders, with unit tests in tests and its subfolders.
+- JSON files for translations are located in the custom_components/tuya_selfhost/translations folder.
+- Icons for translation keys are defined in custom_components/tuya_selfhost/icons.json, and use icons from the material design icons at https://pictogrammers.com/library/mdi/
+- Where possible, new devices should use existing translation_keys which are present in custom_components/tuya_selfhost/translations/*.json and custom_components/tuya_selfhost/icons.json
+- if new translation_keys are added, they should be generic, not device specific, and translations in the appropriate language should be added to all files in custom_components/tuya_selfhost/translations and relevant icons to custom_components/tuya_selfhost/icons.json. It is best to submit additional translations as a separate PR request from new device submissions, as they can involve a lot of rework to existing configs.
 - Device and entity names should follow the Home Assistant naming guidelines. Only the first word should be capitalised.
 - Try to keep device and entity names concise.
 - Top level names should be unbranded and without redundant words like "Smart" or "WiFi".
@@ -37,8 +37,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## Rules for making config files
 
-- The configuration file format is defined in `custom_components/tuya_local/devices/device_config_schema.json` and documented in `custom_components/tuya_local/devices/README.md`.
-- Likely a device with the same functionality already exists. Search the `custom_components/tuya_local/devices` folder for a device with the same set of functions. `uv run best_match '${LOCAL_LOG}'` can be helpful for finding the closest match.
+- The configuration file format is defined in `custom_components/tuya_selfhost/devices/device_config_schema.json` and documented in `custom_components/tuya_selfhost/devices/README.md`.
+- Likely a device with the same functionality already exists. Search the `custom_components/tuya_selfhost/devices` folder for a device with the same set of functions. `uv run best_match '${LOCAL_LOG}'` can be helpful for finding the closest match.
 - If a device config matches perfectly except for the product details, then an entry can be made under the products section of that config for the user's device instead of creating a new config file.
 - If a device config is found that is close, but not perfectly matching, it can be used as a template for a new config. If multiple files are close matches, the most recently added one is likely to be the best quality template to follow.
 - To create a unique but concise filename, the format `${BRAND}_${MODEL}_${TYPE}.yaml` is used, where ${BRAND} is the brand as ASCII lower case letters and numbers with spaces and punctuation removed, ${MODEL} is the model name or number as ASCII lower case letters and numbers with spaces and punctuation removed, and ${TYPE} is the type of device as lower case ASCII letters with spaces and punctuation removed. If model is unknown, then `${BRAND}_${TYPE}` can be used.
@@ -69,7 +69,7 @@ export PATH="$HOME/.local/bin:$PATH"
 ## Testing instructions
 
 - Find the CI plan in the .github/workflows folder
-- Ignore the .github/workflows/hacs-validate.yml workflow if not running from the main repository at https://github.com/make-all/tuya-local
+- Ignore the .github/workflows/hacs-validate.yml workflow if not running from the main repository at https://github.com/constantini-ha/tuya-selfhost
 - run `uv run pytest` to run every test defined for the project
 - run `uv run pytest tests/test_device_config.py` to test only yaml file changes or additions
 - run `uv run pytest tests/test_translations.py` to test only json file changes or additions
@@ -80,4 +80,114 @@ export PATH="$HOME/.local/bin:$PATH"
 ## PR instructions
 
 - Please separate 
-- Always run `uv run ruff check .`, `uv run ruff check --select -I .`, `uv run ruff format --check .` and `uv run yamllint custom_components/tuya_local/devices` before committing
+- Always run `uv run ruff check .`, `uv run ruff check --select -I .`, `uv run ruff format --check .` and `uv run yamllint custom_components/tuya_selfhost/devices` before committing
+
+## What this fork adds, and the traps in it
+
+Everything below is specific to tuya-selfhost. None of it exists upstream, and
+all of it was learned by running against real hardware — if something here
+contradicts your instinct, trust the note.
+
+### The panel and the cards
+
+- `custom_components/tuya_selfhost/frontend/` is served at `/tuya_selfhost/frontend`
+  by `remote_card.py`, which also registers the sidebar panel and pushes both
+  dashboard cards through `add_extra_js_url`.
+- The files are loaded as ES modules, so `import` between files in that folder
+  works. `i18n.js` holds every string, in English, Portuguese and Spanish.
+- **No user-visible string is ever written inline.** Add the key to all three
+  tables in `i18n.js` and call `this._t(key, vars)` in the panel or
+  `t(this.hass, key, vars)` in a card. `tn(key)` reads `navigator.language` and
+  exists only for the card-picker labels, which run before `hass` is available.
+- A custom panel replaces Home Assistant's own header, so it has to provide the
+  sidebar button itself by firing `hass-toggle-menu`.
+- Style against theme variables (`--primary-color`, `--divider-color`,
+  `--secondary-text-color`, …). The panel must look right under any theme.
+- Icon buttons in the top bar are styled by `.bar button.menu`; that selector is
+  scoped to the bar, so an icon button anywhere else needs `.icon` or it renders
+  with the browser's default border.
+- Destructive actions confirm in place: the row or a banner swaps to
+  "yes / cancel" rather than opening a dialog. See `_confirmControl` and
+  `_confirmButton`.
+
+### Remote layouts and the keys they become
+
+- The panel stores remotes in a `Store` named `tuya_selfhost_remote_layouts`,
+  keyed by the remote entity id:
+  `{controls: [{id, name, device, buttons: [{command, name, icon, taught}]}]}`.
+- Pressing a key calls `remote.send_command` with `device` and `command`.
+- `remote_keys.py` turns every **taught** key into a `button` entity so voice
+  assistants and automations can reach it. It re-syncs on the
+  `tuya_selfhost_layouts_changed` dispatcher signal and once at startup.
+- Platform forwarding in `__init__.py` is derived from the device config's
+  entity list, so `button` is added explicitly whenever `remote` is present —
+  an emitter has no Tuya buttons of its own. `async_tuya_setup_platform` raises
+  `ValueError` when a platform has no entities, so `button.py` checks the device
+  config before calling it.
+
+### Home Assistant traps that cost real debugging time
+
+- **Mark dispatcher and timer handlers with `@callback`.** Without it Home
+  Assistant runs them in a `SyncWorker` thread and any `async_create_task` from
+  there raises `RuntimeError: ... from a thread other than the event loop`. This
+  has bitten this integration twice: `async_detect_reserve` and
+  `remote_keys._schedule`.
+- **`suggested_object_id` is only a base.** Home Assistant prefixes it with the
+  area and the device, so `tuya_remote_ar_da_sala_frio_22` becomes
+  `button.sala_de_estar_controle_remoto_..._tuya_remote_ar_da_sala_frio_22`.
+  Where a stable prefix matters — the Alexa filter glob does — set
+  `self.entity_id` outright in `__init__`.
+- **The registry resurrects deleted entity ids.** A removed entity is kept under
+  `deleted_entities`, and an entity re-added with the same `unique_id` gets its
+  old entity_id back. When testing entity naming, change the unique_id or the
+  old id will mask the fix.
+- **`friendly_name` carries the device name** once the entity has `device_info`,
+  whatever `has_entity_name` says. For anything spoken aloud, override the name
+  where it is consumed rather than fighting the registry.
+
+### Alexa
+
+- `button` maps to `AlexaSceneController` (no deactivation), display category
+  `ACTIVITY_TRIGGER`. The phrase is "turn on <name>", and that is why remote
+  keys are buttons rather than scripts.
+- **A self-hosted skill is not told about new entities.**
+  `async_send_add_or_update_message` is only called from `cloud/alexa_config.py`
+  (Nabu Casa). With a manual `alexa:` block the user has to say "discover
+  devices" after adding a key. Say so in the UI; do not imply otherwise.
+- The generated block therefore carries `include_entity_globs` with
+  `button.tuya_remote_*`, so keys learned later are already in the filter and
+  only the discovery is missing.
+- Proactive state reporting needs `endpoint`, `client_id` and `client_secret`,
+  **and the skill relinked**: Amazon only sends the authorisation grant at the
+  moment the account is linked. `.storage/alexa_auth` appearing is the proof it
+  arrived. pt-BR is served by the North America gateway,
+  `https://api.amazonalexa.com/v3/events`.
+- `ALEXA_SKILL.md` (plus `.pt-BR` and `.es`) builds the skill, the Lambda and
+  account linking from zero; `ALEXA.md` covers the entity side. Keep the Lambda
+  code identical across the three translations.
+
+### Bluetooth
+
+- Tuya combo modules advertise service `0000a201` at **the Wi-Fi MAC plus one**.
+- The uuid is in the advertisement; `key = md5(service_data[1:])`, then AES-128-CBC
+  (key used as iv) over `manufacturer_data[6:]`. `service_data[0]` is 0 for a
+  product id and **1 for a product key** — upstream only handled 0.
+- Keep **one shared session per address**. Two `TuyaBLEDevice` objects on the
+  same radio produce duplicate and garbled packets.
+- A weak signal is not a reason to give up: `bleak_retry_connector` has held
+  GATT sessions at −98 dBm, where a single `bluetoothctl` attempt fails.
+- The first status read comes back empty; wait `STATUS_SETTLE_STEPS` before
+  deciding a device is mute.
+
+### Testing the frontend
+
+- Playwright drives the real Home Assistant. Browsers live in
+  `~/.cache/ms-playwright`; pass `executablePath` so nothing is downloaded, and
+  set `LD_LIBRARY_PATH` to the folder holding the Chrome dependencies.
+- `getByText` pierces shadow DOM; `document.body.innerText` does not, so walk
+  `shadowRoot` when reading the panel's text.
+- Save a storage state once and reuse it — repeated logins hit a 429.
+- Home Assistant takes several seconds to paint after `domcontentloaded`. Waits
+  under 9 s produce flaky, meaningless failures.
+- Clean up anything a test creates: these runs go against the user's live
+  installation.

@@ -9,9 +9,9 @@ marcas locais não falam, e nenhuma configuração muda isso.
 A saída é parar de adivinhar o protocolo e copiar o sinal: ensinar o seu controle
 físico ao blaster e depois repetir o que ele gravou.
 
-## O caminho fácil: a página Controles Tuya
+## O caminho fácil: o painel Tuya Selfhost
 
-A integração traz um construtor. Abra **Controles Tuya** na barra lateral, crie um
+A integração traz um construtor. Abra **Tuya Selfhost** na barra lateral, crie um
 controle, acrescente botões com nome e ícone, e ensine um por um. Cada captura
 oferece **Testar / Manter / Descartar**, então uma leitura ruim nunca substitui
 uma boa em silêncio, e as setas embaixo de cada botão definem a posição dele.
@@ -131,3 +131,26 @@ sugere um estado que o Home Assistant não consegue ler.
 Os códigos aprendidos são guardados por device id. Se você re-parear o blaster no
 app da Tuya ele ganha um id novo, o que até aqui deixava órfãos todos os códigos ensinados.
 Use **Reconfigurar** na entrada em vez de apagá-la, e os códigos vão junto.
+
+## Apertar uma tecla pela voz
+
+Cada tecla que você ensina também vira uma entidade `button`, chamada
+`<controle> <tecla>` e agrupada no emissor. É isso que deixa ela ao alcance de
+uma automação, de um script ou de um assistente de voz.
+
+A Alexa trata botão como cena, então o comando é *ligar*:
+
+> "Alexa, ligar Ar da sala Frio 22"
+
+O bloco gerado pela ação **configuração da Alexa** já traz um curinga que cobre
+todas as teclas, as de hoje e as de amanhã, então você nunca precisa gerar de
+novo depois de ensinar mais uma. O que você precisa fazer é deixar a Alexa
+achar:
+
+> "Alexa, descobrir dispositivos"
+
+Uma skill própria não fica sabendo de entidade nova sozinha — só quem assina o
+Nabu Casa tem isso. Uma descoberta depois de criar as teclas é todo o custo.
+
+[Expondo seus aparelhos para a Alexa](ALEXA.pt-BR.md) cobre o resto, e
+[Montando a skill da Alexa do zero](ALEXA_SKILL.pt-BR.md) cobre a skill em si.
