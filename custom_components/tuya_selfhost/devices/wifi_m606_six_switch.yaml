@@ -190,3 +190,18 @@ entities:
         name: value
         type: base64
         optional: true
+
+  - entity: select
+    translation_key: light_mode
+    category: config
+    dps:
+      - id: 15
+        type: string
+        name: option
+        mapping:
+          - dps_val: relay
+            value: state
+          - dps_val: pos
+            value: locator
+          - dps_val: none
+            value: "off"
