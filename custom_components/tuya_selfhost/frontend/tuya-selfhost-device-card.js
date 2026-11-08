@@ -22,6 +22,22 @@ const STYLE = `
     justify-content:center; background:var(--secondary-background-color) }
   .action ha-icon { --mdc-icon-size:21px }
   .empty { padding:16px; color:var(--secondary-text-color) }
+  .head { display:flex; align-items:center; gap:14px; padding:16px; cursor:pointer }
+  .head .glyph { width:46px; height:46px; border-radius:12px; flex:none; display:flex;
+    align-items:center; justify-content:center; background:var(--secondary-background-color) }
+  .head .glyph ha-icon { --mdc-icon-size:26px; color:var(--state-icon-color, var(--primary-text-color)) }
+  .head .grow { flex:1; min-width:0 }
+  .head .name { font-size:1.02em; color:var(--primary-text-color) }
+  .head .sub { font-size:.8em; color:var(--secondary-text-color) }
+  .head .chev { color:var(--secondary-text-color); transition:transform .2s }
+  .head .chev.open { transform:rotate(180deg) }
+  .quick { display:flex; gap:8px; flex:none }
+  .power { width:38px; height:38px; border-radius:50%; border:none; cursor:pointer; display:flex;
+    align-items:center; justify-content:center; background:var(--secondary-background-color);
+    color:var(--secondary-text-color) }
+  .power.on { background:var(--primary-color); color:var(--text-primary-color) }
+  .power ha-icon { --mdc-icon-size:19px }
+  .body { border-top:1px solid var(--divider-color) }
 `;
 
 class TuyaSelfhostDeviceCard extends HTMLElement {
@@ -31,6 +47,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
     }
     this._config = config;
     this._gangs = null;
+    this._expanded = config.expanded === true;
     this._loaded = false;
     this.innerHTML = "";
   }
@@ -82,16 +99,89 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
     return (title ? full.replace(title, "").trim() : full) || full;
   }
 
+  _area() {
+    const first = (this._gangs || [])[0];
+    const entities = this._hass.entities || {};
+    const areas = this._hass.areas || {};
+    const devices = this._hass.devices || {};
+    const entry = first ? entities[first] : null;
+    const areaId = entry
+      ? entry.area_id || (devices[entry.device_id] || {}).area_id
+      : null;
+    return areaId && areas[areaId] ? areas[areaId].name : null;
+  }
+
+  _summary() {
+    const states = (this._gangs || []).map((id) => (this._hass.states[id] || {}).state);
+    if (!states.length) return "";
+    if (states.every((s) => s === "unavailable")) return "O aparelho está offline";
+    const on = states.filter((s) => s === "on").length;
+    if (!on) return "Tudo desligado";
+    return on === states.length ? "Tudo ligado" : `${on} de ${states.length} ligadas`;
+  }
+
   _render() {
     this._shown = this._signature();
     const card = document.createElement("ha-card");
-    if (this._config.title) card.header = this._config.title;
 
     if (this._error) {
       card.innerHTML = `<div class="empty">Não consegui ler o aparelho: ${this._error}</div>`;
     } else if (!this._gangs || !this._gangs.length) {
       card.innerHTML = `<div class="empty">Este aparelho não tem teclas para mostrar.</div>`;
     } else {
+      const head = document.createElement("div");
+      head.className = "head";
+      const area = this._area();
+      head.innerHTML = `
+        <span class="glyph"><ha-icon icon="${this._config.icon || "mdi:light-switch"}"></ha-icon></span>
+        <span class="grow">
+          <div class="name">${this._config.title || "Aparelho"}</div>
+          <div class="sub">${[area, this._summary()].filter(Boolean).join(" · ")}</div>
+        </span>`;
+      const quick = document.createElement("div");
+      quick.className = "quick";
+      const anyOn = this._gangs.some((id) => (this._hass.states[id] || {}).state === "on");
+      const power = (icon, on, fn, title) => {
+        const b = document.createElement("button");
+        b.className = on ? "power on" : "power";
+        b.title = title;
+        b.innerHTML = `<ha-icon icon="${icon}"></ha-icon>`;
+        b.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          fn();
+        });
+        return b;
+      };
+      quick.append(
+        power("mdi:power", anyOn, () =>
+          this._hass.callService("homeassistant", anyOn ? "turn_off" : "turn_on", {
+            entity_id: this._gangs,
+          }),
+          anyOn ? "Desligar tudo" : "Ligar tudo"
+        )
+      );
+      const chev = document.createElement("ha-icon");
+      chev.setAttribute("icon", "mdi:chevron-down");
+      chev.className = this._expanded ? "chev open" : "chev";
+      head.append(quick, chev);
+      head.addEventListener("click", () => {
+        this._expanded = !this._expanded;
+        this._render();
+      });
+      card.appendChild(head);
+
+      if (!this._expanded) {
+        const style = document.createElement("style");
+        style.textContent = STYLE;
+        this.innerHTML = "";
+        this.append(style, card);
+        return;
+      }
+
+      const body = document.createElement("div");
+      body.className = "body";
+      card.appendChild(body);
+
       const grid = document.createElement("div");
       grid.className = "tiles";
       for (const id of this._gangs) {
@@ -113,7 +203,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         wrap.append(tile, name);
         grid.appendChild(wrap);
       }
-      card.appendChild(grid);
+      body.appendChild(grid);
 
       const actions = document.createElement("div");
       actions.className = "actions";
@@ -136,7 +226,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
           window.dispatchEvent(new CustomEvent("location-changed"));
         })
       );
-      card.appendChild(actions);
+      body.appendChild(actions);
     }
 
     const style = document.createElement("style");
@@ -146,6 +236,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
   }
 
   getCardSize() {
+    if (!this._expanded) return 2;
     return 2 + Math.ceil(((this._gangs || []).length || 1) / 3) * 2;
   }
 }
