@@ -41,10 +41,15 @@ async def async_detect_reserve(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     mac = (await hass.async_add_executor_job(arp_table)).get(host)
     if not mac:
+        _LOGGER.debug("%s: %s is not in the ARP cache", entry.title, host)
         return
 
     address = _radio_address(mac)
     if not _is_advertising(hass, address):
+        _LOGGER.debug(
+            "%s: %s is at %s, so its radio would be %s, which is not advertising",
+            entry.title, host, mac, address,
+        )
         return
 
     _LOGGER.info(
