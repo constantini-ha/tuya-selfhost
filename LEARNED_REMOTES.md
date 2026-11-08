@@ -162,3 +162,29 @@ key, and no discovery will change that. The generated block gets this right.
 
 [Exposing your devices to Alexa](ALEXA.md) covers the rest, and
 [Building the Alexa skill from scratch](ALEXA_SKILL.md) covers the skill itself.
+
+### Naming a key so Alexa understands it
+
+Alexa sees a button as a **scene**, and a scene only answers to *turn on*. There
+is no *turn off*: a key that switches the appliance off is its own scene, and it
+needs a name that reads naturally after "turn on".
+
+The name Alexa gets is the entity's, which Home Assistant builds as
+`<emitter> <remote> <key>` — far too long to say. Give it a short one in the
+`entity_config` section of your `alexa:` block:
+
+```yaml
+      button.tuya_remote_living_room_ac_on:
+        name: Air conditioning
+      button.tuya_remote_living_room_ac_off:
+        name: Air off
+```
+
+Then "Alexa, turn on the air conditioning" and "Alexa, turn on air off". The
+second reads oddly in English; an Alexa routine in the app can map any phrase
+you like onto the scene, which is the usual way around it.
+
+Change a name and the key has to go out again: the **Send the keys to Alexa**
+button does that. A key you delete here is dropped from Alexa automatically, and
+`tuya_selfhost.alexa_announce` takes a `forget` list for scenes left over from
+before this was handled.

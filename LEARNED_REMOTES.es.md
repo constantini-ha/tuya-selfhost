@@ -164,3 +164,29 @@ viene bien.
 
 [Exponiendo tus dispositivos a Alexa](ALEXA.es.md) cubre el resto, y
 [Montando la skill de Alexa desde cero](ALEXA_SKILL.es.md) cubre la skill en sí.
+
+### Ponerle un nombre que Alexa entienda
+
+Alexa ve un botón como una **escena**, y una escena solo responde a *enciende*
+(o *activa*). No existe *apaga*: la tecla que apaga el aparato es una escena
+propia, y necesita un nombre que suene bien después de "enciende".
+
+El nombre que le llega a Alexa es el de la entidad, que Home Assistant arma como
+`<emisor> <mando> <tecla>` — demasiado largo para decirlo. Dale uno corto en la
+sección `entity_config` de tu bloque `alexa:`:
+
+```yaml
+      button.tuya_remote_aire_encender:
+        name: Aire acondicionado
+      button.tuya_remote_aire_apagar:
+        name: Aire apagado
+```
+
+Así "Alexa, enciende el aire acondicionado" y "Alexa, enciende aire apagado". El
+segundo suena raro; una rutina en la aplicación de Alexa asocia la frase que
+quieras a la escena, que es la salida de siempre.
+
+Si cambias un nombre, la tecla tiene que salir otra vez: el botón **Enviar las
+teclas a Alexa** lo hace. Una tecla que borres aquí desaparece de Alexa sola, y
+la acción `tuya_selfhost.alexa_announce` acepta una lista `forget` para las
+escenas que quedaron de antes de que esto existiera.

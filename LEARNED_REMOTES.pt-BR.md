@@ -161,3 +161,29 @@ todas as teclas, e nenhuma descoberta resolve. O bloco gerado já vem certo.
 
 [Expondo seus aparelhos para a Alexa](ALEXA.pt-BR.md) cobre o resto, e
 [Montando a skill da Alexa do zero](ALEXA_SKILL.pt-BR.md) cobre a skill em si.
+
+### Dar um nome que a Alexa entenda
+
+A Alexa enxerga botão como **cena**, e cena só atende a *ligar* (ou *ativar*).
+Não existe *desligar*: a tecla que desliga o aparelho é uma cena própria, e
+precisa de um nome que soe bem depois de "ligar".
+
+O nome que chega na Alexa é o da entidade, que o Home Assistant monta como
+`<emissor> <controle> <tecla>` — comprido demais para falar. Dê um nome curto na
+seção `entity_config` do seu bloco `alexa:`:
+
+```yaml
+      button.tuya_remote_ar_condicionado_ligar:
+        name: Ar condicionado
+      button.tuya_remote_ar_condicionado_desligar:
+        name: Ar desligado
+```
+
+Daí "Alexa, ligar o ar condicionado" e "Alexa, ligar ar desligado". O segundo
+soa esquisito; uma rotina no aplicativo da Alexa associa a frase que você quiser
+à cena, que é a saída de sempre.
+
+Trocou um nome, a tecla precisa sair de novo: o botão **Enviar as teclas para a
+Alexa** faz isso. Tecla apagada aqui sai da Alexa sozinha, e a ação
+`tuya_selfhost.alexa_announce` aceita uma lista `forget` para as cenas que
+ficaram de antes disso existir.

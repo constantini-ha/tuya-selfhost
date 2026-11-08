@@ -28,4 +28,9 @@ alexa_config:
   fields: {}
 
 alexa_announce:
-  fields: {}
+  fields:
+    forget:
+      example: "button.tuya_remote_ar_condicionado_frio_22"
+      selector:
+        text:
+          multiple: true

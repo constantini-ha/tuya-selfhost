@@ -172,6 +172,14 @@ contradicts your instinct, trust the note.
   moment the account is linked. `.storage/alexa_auth` appearing is the proof it
   arrived. pt-BR is served by the North America gateway,
   `https://api.amazonalexa.com/v3/events`.
+- A scene has no *off*: `supports_deactivation=False`, so "turn off <key>" never
+  works. An off key is a separate scene and needs a name that reads after "turn
+  on". The name Alexa gets comes from `entity_config`, falling back to the
+  entity's own — which carries the device prefix and is unusable by voice.
+- Renaming only reaches Alexa on the next AddOrUpdate, and a deleted key leaves
+  a dead scene behind unless a DeleteReport goes out. Both are wired:
+  `async_announce_to_alexa` and `async_forget_in_alexa`, plus the `forget` list
+  on the `alexa_announce` action for scenes orphaned before that existed.
 - `ALEXA_SKILL.md` (plus `.pt-BR` and `.es`) builds the skill, the Lambda and
   account linking from zero; `ALEXA.md` covers the entity side. Keep the Lambda
   code identical across the three translations.

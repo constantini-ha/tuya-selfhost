@@ -149,7 +149,13 @@
         },
         "alexa_announce": {
             "name": "Send remote keys to Alexa",
-            "description": "Hands every learned remote key to Alexa straight away, so you do not have to ask it to discover devices."
+            "description": "Hands every learned remote key to Alexa straight away, so you do not have to ask it to discover devices.",
+            "fields": {
+                "forget": {
+                    "name": "Keys to forget",
+                    "description": "Entity IDs of keys that no longer exist here but that Alexa still shows. Leave empty to only send the current ones."
+                }
+            }
         }
     },
     "entity": {

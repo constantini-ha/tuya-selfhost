@@ -21,7 +21,11 @@ from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .helpers.arp import arp_table
 from .infrared import TuyaRemoteCommand
 from .remote import FLAG_SAVE_DELAY, TuyaLocalRemote
-from .remote_keys import OBJECT_ID_PREFIX, async_announce_to_alexa
+from .remote_keys import (
+    OBJECT_ID_PREFIX,
+    async_announce_to_alexa,
+    async_forget_in_alexa,
+)
 
 REMOTE_SEND_IR_COMMAND_SCHEMA = {
     vol.Required("emitter_entity_id"): cv.entity_id,
@@ -54,7 +58,7 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
         DOMAIN,
         "alexa_announce",
         partial(async_handle_alexa_announce, hass),
-        schema=vol.Schema({}),
+        schema=vol.Schema({vol.Optional("forget"): vol.All(cv.ensure_list, [cv.string])}),
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
@@ -140,7 +144,14 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
     return {"yaml": "\n".join(lines), "entity_count": len(entities)}
 
 async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
-    """Hand every remote key to Alexa, without waiting for a discovery."""
+    """Hand every remote key to Alexa, without waiting for a discovery.
+
+    `forget` drops endpoints Alexa still shows for keys that no longer exist —
+    a scene deleted here leaves no trace there.
+    """
+    forget = call.data.get("forget") or []
+    forgotten = await async_forget_in_alexa(hass, list(forget))
+
     registry = er.async_get(hass)
     entity_ids = [
         item.entity_id
@@ -151,7 +162,11 @@ async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
         and not item.hidden_by
     ]
     sent = await async_announce_to_alexa(hass, entity_ids)
-    return {"entity_count": len(entity_ids), "sent": sent}
+    return {
+        "entity_count": len(entity_ids),
+        "sent": sent,
+        "forgotten": len(forget) if forgotten else 0,
+    }
 
 
 def _host_sort_key(device: dict) -> list[int]:

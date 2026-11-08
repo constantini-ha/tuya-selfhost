@@ -149,7 +149,13 @@
         },
         "alexa_announce": {
             "name": "Enviar las teclas a Alexa",
-            "description": "Entrega al momento todas las teclas de mando aprendidas a Alexa, para que no tengas que pedirle que detecte dispositivos."
+            "description": "Entrega al momento todas las teclas de mando aprendidas a Alexa, para que no tengas que pedirle que detecte dispositivos.",
+            "fields": {
+                "forget": {
+                    "name": "Teclas que olvidar",
+                    "description": "IDs de entidades de teclas que ya no existen aquí pero que Alexa sigue mostrando. Déjalo vacío para enviar solo las actuales."
+                }
+            }
         }
     },
     "entity": {

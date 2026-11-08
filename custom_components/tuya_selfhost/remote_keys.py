@@ -62,11 +62,15 @@ async def async_setup_remote_keys(
             known.update(b.unique_id for b in fresh)
             await async_announce_to_alexa(hass, [b.entity_id for b in fresh])
 
+        gone = []
         for uid in known - set(wanted):
             entity_id = registry.async_get_entity_id("button", DOMAIN, uid)
             if entity_id:
                 registry.async_remove(entity_id)
+                gone.append(entity_id)
             known.discard(uid)
+        if gone:
+            await async_forget_in_alexa(hass, gone)
 
     # Marked as a callback, or the dispatcher runs it in a worker thread.
     @callback
@@ -139,16 +143,17 @@ def _alexa_config(hass: HomeAssistant):
     return None
 
 
-async def async_announce_to_alexa(hass: HomeAssistant, entity_ids: list[str]) -> bool:
-    """Hand new keys to Alexa, so the user does not have to run a discovery.
+async def _async_tell_alexa(hass: HomeAssistant, entity_ids: list[str], *, gone: bool) -> bool:
+    """Send one discovery message about these keys.
 
-    Home Assistant sends this only for Nabu Casa accounts; a self-hosted skill
+    Home Assistant sends these only for Nabu Casa accounts; a self-hosted skill
     is left to find out on its own. When anything is missing — no Alexa, no
     proactive reporting, no grant yet — the user still has "discover devices".
     """
     try:
         from homeassistant.components.alexa.state_report import (
             async_send_add_or_update_message,
+            async_send_delete_message,
         )
     except ImportError:
         return False
@@ -158,16 +163,29 @@ async def async_announce_to_alexa(hass: HomeAssistant, entity_ids: list[str]) ->
 
     config = _alexa_config(hass)
     if config is None:
-        _LOGGER.debug("No self-hosted Alexa skill set up; keys not announced")
+        _LOGGER.debug("No self-hosted Alexa skill set up; keys not reported")
         return False
     if not getattr(config, "should_report_state", False):
-        _LOGGER.debug("Alexa proactive reporting is off; keys not announced")
+        _LOGGER.debug("Alexa proactive reporting is off; keys not reported")
         return False
 
+    send = async_send_delete_message if gone else async_send_add_or_update_message
     try:
-        await async_send_add_or_update_message(hass, config, entity_ids)
+        await send(hass, config, entity_ids)
     except Exception as err:  # the skill is Amazon's, every failure is theirs
-        _LOGGER.debug("Alexa did not accept the new keys (%s); ask it to discover", err)
+        _LOGGER.debug("Alexa refused the key list (%s); ask it to discover", err)
         return False
-    _LOGGER.info("Announced %s to Alexa", ", ".join(entity_ids))
+    _LOGGER.info(
+        "Told Alexa to %s %s", "forget" if gone else "add", ", ".join(entity_ids)
+    )
     return True
+
+
+async def async_announce_to_alexa(hass: HomeAssistant, entity_ids: list[str]) -> bool:
+    """Hand new keys to Alexa, so the user does not have to run a discovery."""
+    return await _async_tell_alexa(hass, entity_ids, gone=False)
+
+
+async def async_forget_in_alexa(hass: HomeAssistant, entity_ids: list[str]) -> bool:
+    """Drop deleted keys from Alexa, so no dead scene is left behind."""
+    return await _async_tell_alexa(hass, entity_ids, gone=True)
