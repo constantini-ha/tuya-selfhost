@@ -171,6 +171,10 @@ and that is worth setting up: "turn on the air conditioning" and "turn off the
 air conditioning" both work, which is how anyone expects to talk to an
 appliance.
 
+Icons are picked from a grid that draws them, not a list of names: "snowflake"
+tells you less than a snowflake does. The ◉ under a key changes the icon of a
+key that already exists.
+
 In **Edit**, under **Power pair**, pick the key that turns it on and the key
 that turns it off. The two stop being scenes and become one switch.
 

@@ -169,6 +169,10 @@ Um par — uma tecla que liga o aparelho e uma que desliga — é um **dispositi
 e vale a pena montar: "ligar o ar condicionado" e "desligar o ar condicionado"
 funcionam os dois, que é como qualquer um espera falar com um aparelho.
 
+O ícone sai de uma grade que desenha os ícones, não de uma lista de nomes:
+"snowflake" diz menos do que um floco de neve. O ◉ embaixo de uma tecla troca o
+ícone de uma que já existe.
+
 Em **Editar**, no **Par de energia**, escolha a tecla que liga e a que desliga.
 As duas deixam de ser cenas e viram um switch só.
 

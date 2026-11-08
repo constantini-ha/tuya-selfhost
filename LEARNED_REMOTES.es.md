@@ -173,6 +173,10 @@ escena. Un par — una tecla que enciende el aparato y otra que lo apaga — es 
 "apaga el aire acondicionado" funcionan las dos, que es como cualquiera espera
 hablarle a un aparato.
 
+El icono sale de una rejilla que los dibuja, no de una lista de nombres:
+"snowflake" dice menos que un copo de nieve. El ◉ debajo de una tecla cambia el
+icono de una que ya existe.
+
 En **Editar**, en **Par de encendido**, elige la tecla que enciende y la que
 apaga. Las dos dejan de ser escenas y se convierten en un solo switch.
 

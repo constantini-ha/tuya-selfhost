@@ -25,6 +25,12 @@ const STYLE = `
 button.icon { border:none; background:transparent; color:var(--secondary-text-color);
   cursor:pointer; padding:6px; border-radius:50%; display:flex; --mdc-icon-size:22px }
 button.icon:hover { background:rgba(127,127,127,.18) }
+.icons { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px }
+.iconpick { width:44px; height:44px; border-radius:12px; cursor:pointer; display:flex;
+  align-items:center; justify-content:center; --mdc-icon-size:22px; font:inherit;
+  border:1px solid var(--divider-color); background:transparent; color:var(--primary-text-color) }
+.iconpick[aria-pressed="true"] { background:var(--primary-color); border-color:var(--primary-color);
+  color:var(--text-primary-color) }
 .wrap { padding:16px; max-width:920px; margin:0 auto }
 ha-card { margin-bottom:16px; overflow:hidden }
 .pad { padding:16px }
@@ -422,7 +428,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     bar.className = "bar";
     const menu = document.createElement("button");
     menu.className = "menu";
-    menu.title = "Menu";
+    menu.title = this._t("devices");
     menu.innerHTML = `<ha-icon icon="mdi:menu"></ha-icon>`;
     // Our own header replaces Home Assistant's, so it has to carry the way back
     // to the sidebar as well.
@@ -993,7 +999,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       toggle.className = "toggle";
       toggle.setAttribute("role", "switch");
       toggle.setAttribute("aria-checked", on ? "true" : "false");
-      toggle.title = on ? "Desligar" : "Ligar";
+      toggle.title = this._t(on ? "turn_off" : "turn_on");
       toggle.disabled = !state || state.state === "unavailable";
       toggle.innerHTML = '<span class="knob"></span>';
       toggle.addEventListener("click", () =>
@@ -1003,7 +1009,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     } else if (domain === "button" || domain === "scene") {
       const press = document.createElement("button");
       press.className = "act ghost";
-      press.textContent = "Acionar";
+      press.textContent = this._t("activate");
       press.addEventListener("click", () =>
         this._hass.callService(domain, domain === "button" ? "press" : "turn_on", {
           entity_id: id,
@@ -1029,7 +1035,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       const locked = state.state === "locked";
       const act = document.createElement("button");
       act.className = "act ghost";
-      act.textContent = locked ? "Destrancar" : "Trancar";
+      act.textContent = this._t(locked ? "do_unlock" : "do_lock");
       act.addEventListener("click", () =>
         this._hass.callService("lock", locked ? "unlock" : "lock", { entity_id: id })
       );
@@ -1055,6 +1061,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     back.addEventListener("click", () => {
       this._remote = null;
       this._confirm = null;
+      this._iconFor = null;
       this._render();
     });
     const edit = document.createElement("button");
@@ -1081,7 +1088,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       slot.className = "keyslot";
       const key = document.createElement("button");
       key.className = button.taught ? "key" : "key untaught";
-      key.title = button.taught ? "Tocar para enviar" : "Tocar para aprender";
+      key.title = this._t(button.taught ? "tap_send" : "tap_learn");
       key.innerHTML = `<ha-icon icon="${button.icon}"></ha-icon><span>${button.name}</span>`;
       key.addEventListener("click", () =>
         button.taught ? this._press(index) : this._learn(index)
@@ -1102,8 +1109,12 @@ class TuyaSelfhostPanel extends HTMLElement {
         return b;
       };
       tools.append(
-        mk("←", "", () => this._moveButton(index, -1)),
-        mk("→", "", () => this._moveButton(index, 1)),
+        mk("←", this._t("move"), () => this._moveButton(index, -1)),
+        mk("→", this._t("move"), () => this._moveButton(index, 1)),
+        mk("◉", this._t("icon_change"), () => {
+          this._iconFor = index;
+          this._render();
+        }),
         mk("⟳", this._t("edit"), () => this._learn(index)),
         mk("✕", this._t("delete"), () => {
           this._confirmButton = index;
@@ -1215,24 +1226,57 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
 
     const form = document.createElement("div");
-    form.className = "pad row";
+    form.className = "pad";
+    const line = document.createElement("div");
+    line.className = "row";
     const name = document.createElement("input");
     name.className = "grow";
     name.placeholder = this._t("button_name");
-    const icon = document.createElement("select");
-    for (const i of ICONS) {
-      const o = document.createElement("option");
-      o.value = i;
-      o.textContent = i.replace("mdi:", "");
-      icon.appendChild(o);
-    }
     const add = document.createElement("button");
     add.className = "act";
     add.textContent = this._t("add_button");
+    this._newIcon = this._newIcon || ICONS[0];
     add.addEventListener("click", () => {
-      if (name.value.trim()) this._addButton(name.value.trim(), icon.value);
+      if (name.value.trim()) this._addButton(name.value.trim(), this._newIcon);
     });
-    form.append(name, icon, add);
+    line.append(name, add);
+    form.appendChild(line);
+
+    const editing = control.buttons[this._iconFor];
+    const label = document.createElement("div");
+    label.className = "muted";
+    label.style.marginTop = "12px";
+    label.textContent = editing
+      ? this._t("icon_for", { name: editing.name })
+      : this._t("icon_label");
+    form.appendChild(label);
+
+    const picker = document.createElement("div");
+    picker.className = "icons";
+    const chosen = editing ? editing.icon : this._newIcon;
+    for (const i of ICONS) {
+      const pick = document.createElement("button");
+      pick.className = "iconpick";
+      pick.setAttribute("aria-pressed", String(chosen === i));
+      pick.title = i.replace("mdi:", "");
+      pick.innerHTML = `<ha-icon icon="${i}"></ha-icon>`;
+      pick.addEventListener("click", async () => {
+        if (editing) {
+          editing.icon = i;
+          this._iconFor = null;
+          await this._save(this._remoteOf(this._entry()));
+          this._render();
+          return;
+        }
+        // Repainting here would throw away whatever is typed in the name field.
+        this._newIcon = i;
+        for (const other of picker.children) {
+          other.setAttribute("aria-pressed", String(other === pick));
+        }
+      });
+      picker.appendChild(pick);
+    }
+    form.appendChild(picker);
     card.appendChild(form);
 
     const tip = document.createElement("div");
