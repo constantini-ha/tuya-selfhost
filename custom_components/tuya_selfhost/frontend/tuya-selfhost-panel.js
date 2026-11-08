@@ -2,6 +2,7 @@ import { t } from "./i18n.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
+const LAYOUT_SUB = "tuya_selfhost/layout/subscribe";
 
 const ICONS = [
   "mdi:power", "mdi:snowflake", "mdi:snowflake-melt", "mdi:fan",
@@ -189,6 +190,39 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._layouts[remote] = (stored && stored.controls) || [];
     }
     this._render();
+    this._watch();
+  }
+
+  async _watch() {
+    // Another screen — a phone, a second tab — can change the layouts. Without
+    // this the panel keeps what it read at boot and writes that back on save.
+    if (this._unwatch) return;
+    try {
+      this._unwatch = await this._hass.connection.subscribeMessage(
+        () => this._reload(),
+        { type: LAYOUT_SUB }
+      );
+    } catch (err) {
+      this._unwatch = null;
+    }
+  }
+
+  async _reload() {
+    if (this._saving) return;
+    for (const entry of this._entries || []) {
+      const remote = this._remoteOf(entry);
+      if (!remote) continue;
+      const stored = await this._hass.callWS({ type: LAYOUT_GET, key: remote });
+      this._layouts[remote] = (stored && stored.controls) || [];
+    }
+    this._render();
+  }
+
+  disconnectedCallback() {
+    if (this._unwatch) {
+      this._unwatch();
+      this._unwatch = null;
+    }
   }
 
   // ---------- data helpers ----------
@@ -214,6 +248,15 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   async _save(remote) {
+    this._saving = true;
+    try {
+      await this._write(remote);
+    } finally {
+      this._saving = false;
+    }
+  }
+
+  async _write(remote) {
     await this._hass.callWS({
       type: LAYOUT_SET,
       key: remote,

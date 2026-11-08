@@ -106,6 +106,15 @@ contradicts your instinct, trust the note.
 - Icon buttons in the top bar are styled by `.bar button.menu`; that selector is
   scoped to the bar, so an icon button anywhere else needs `.icon` or it renders
   with the browser's default border.
+- **The frontend is served under the version**, `/tuya_selfhost/frontend/<version>/`.
+  A `?v=` query only versions the file that carries it: `i18n.js`, reached by a
+  relative import, kept being served from cache with strings the rest of the
+  build no longer matched. A versioned directory busts everything at once and
+  lets the files cache properly.
+- **A screen that reads once writes stale data back.** The layouts are shared
+  between the panel, the cards and every phone, so each subscribes to
+  `tuya_selfhost/layout/subscribe` and re-reads when it fires. The panel skips
+  the reload while its own save is in flight.
 - A card must not guess an entity id from a name — a rename or a clash breaks it
   silently. `tuya_selfhost/layout/entities` reads the registry and answers which
   entity each control and key became.

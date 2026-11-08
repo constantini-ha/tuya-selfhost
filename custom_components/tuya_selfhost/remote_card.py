@@ -7,9 +7,12 @@ import voluptuous as vol
 from homeassistant.components import panel_custom, websocket_api
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
@@ -35,25 +38,29 @@ async def async_setup_remote_card(hass: HomeAssistant) -> None:
         return
     hass.data[READY_FLAG] = True
 
+    integration = await async_get_integration(hass, DOMAIN)
+    # Serving under the version means a relative import cannot pick up a stale
+    # copy: a query string would only version the file that carries it.
+    base = f"{FRONTEND_URL}/{integration.version}"
+
     await hass.http.async_register_static_paths(
         [
             StaticPathConfig(
-                FRONTEND_URL,
+                base,
                 str(Path(__file__).parent / "frontend"),
-                cache_headers=False,
+                cache_headers=True,
             )
         ]
     )
 
-    integration = await async_get_integration(hass, DOMAIN)
     for card in (CARD_FILE, DEVICE_CARD_FILE):
-        add_extra_js_url(hass, f"{FRONTEND_URL}/{card}?v={integration.version}")
+        add_extra_js_url(hass, f"{base}/{card}")
 
     await panel_custom.async_register_panel(
         hass,
         webcomponent_name="tuya-selfhost-panel",
         frontend_url_path=PANEL_URL_PATH,
-        module_url=f"{FRONTEND_URL}/{PANEL_FILE}?v={integration.version}",
+        module_url=f"{base}/{PANEL_FILE}",
         sidebar_title="Tuya Selfhost",
         sidebar_icon="mdi:home-automation",
         require_admin=True,
@@ -62,6 +69,7 @@ async def async_setup_remote_card(hass: HomeAssistant) -> None:
 
     hass.data[STORAGE_KEY] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
 
+    websocket_api.async_register_command(hass, websocket_subscribe_layouts)
     websocket_api.async_register_command(hass, websocket_layout_entities)
     websocket_api.async_register_command(hass, websocket_get_layout)
     websocket_api.async_register_command(hass, websocket_set_layout)
@@ -132,3 +140,22 @@ def websocket_layout_entities(hass, connection, msg):
             else:
                 slot["keys"][command] = item.entity_id
     connection.send_result(msg["id"], found)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/layout/subscribe"})
+@callback
+def websocket_subscribe_layouts(hass, connection, msg):
+    """Tell every open screen that the layouts changed.
+
+    Without this a panel keeps the copy it read at boot, and the next save
+    writes that stale copy back over whatever another screen did.
+    """
+
+    @callback
+    def _changed() -> None:
+        connection.send_message(websocket_api.event_message(msg["id"], {}))
+
+    connection.subscriptions[msg["id"]] = async_dispatcher_connect(
+        hass, SIGNAL_LAYOUTS, _changed
+    )
+    connection.send_result(msg["id"])

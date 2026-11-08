@@ -2,6 +2,7 @@ import { t, tn } from "./i18n.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_ENTITIES = "tuya_selfhost/layout/entities";
+const LAYOUT_SUB = "tuya_selfhost/layout/subscribe";
 
 const STYLE = `
   .head { display: flex; align-items: center; gap: 14px; padding: 16px; }
@@ -83,6 +84,27 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
       this._error = err.message || String(err);
     }
     this._render();
+    this._watch();
+  }
+
+  async _watch() {
+    // A key taught on a phone should show up here without a reload.
+    if (this._unwatch) return;
+    try {
+      this._unwatch = await this._hass.connection.subscribeMessage(
+        () => this._load(),
+        { type: LAYOUT_SUB }
+      );
+    } catch (err) {
+      this._unwatch = null;
+    }
+  }
+
+  disconnectedCallback() {
+    if (this._unwatch) {
+      this._unwatch();
+      this._unwatch = null;
+    }
   }
 
   _render() {
