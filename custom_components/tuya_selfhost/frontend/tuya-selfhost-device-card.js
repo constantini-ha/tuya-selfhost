@@ -97,6 +97,8 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
             (e) =>
               e.config_entry_id === this._config.entry_id &&
               e.entity_id.startsWith("switch.") &&
+              // A remote's power pair lives on its own card, not among the gangs.
+              !e.entity_id.startsWith("switch.tuya_remote_") &&
               !e.disabled_by &&
               !e.hidden_by
           )

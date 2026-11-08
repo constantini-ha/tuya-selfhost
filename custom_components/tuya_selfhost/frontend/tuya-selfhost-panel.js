@@ -814,8 +814,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     card.appendChild(head);
 
     const entities = this._byEntry[entry.entry_id] || [];
-    const gangs = entities.filter((e) => e.entity_id.startsWith("switch."));
-    const rest = entities.filter((e) => !e.entity_id.startsWith("switch."));
+    const isGang = (e) =>
+      e.entity_id.startsWith("switch.") &&
+      !e.entity_id.startsWith("switch.tuya_remote_");
+    const gangs = entities.filter(isGang);
+    const rest = entities.filter((e) => !isGang(e));
 
     if (this._settings) {
       const list = document.createElement("div");
@@ -832,7 +835,9 @@ class TuyaSelfhostPanel extends HTMLElement {
       return card;
     }
 
-    if (gangs.length) {
+    // An emitter's page is a list of its remotes: everything you do to one of
+    // them lives inside it, so nothing else belongs out here.
+    if (gangs.length && !remote) {
       const grid = document.createElement("div");
       grid.className = "pad tiles";
       grid.style.gridTemplateColumns = "repeat(3, 1fr)";
@@ -868,7 +873,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       b.addEventListener("click", fn);
       return b;
     };
-    if (gangs.length) {
+    if (gangs.length && !remote) {
       const ids = gangs.map((e) => e.entity_id);
       actions.append(
         action("mdi:flash", this._t("all_on"), () =>
@@ -879,7 +884,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         )
       );
     }
-    if (gangs.length) {
+    if (gangs.length && !remote) {
       actions.append(
         action("mdi:view-dashboard-outline", this._t("to_dashboard"), () => this._deviceToDashboard())
       );
