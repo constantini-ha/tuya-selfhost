@@ -40,6 +40,10 @@ ha-card { margin-bottom:16px; overflow:hidden }
 .pill { font-size:.72em; padding:3px 9px; border-radius:999px;
   background:var(--secondary-background-color); color:var(--secondary-text-color) }
 .pill.on { background:var(--primary-color); color:var(--text-primary-color) }
+.pill.good { background:var(--success-color,#43a047); color:#fff }
+.pill.warn { background:var(--warning-color,#ffa726); color:#111 }
+.pill.bad { background:var(--error-color,#db4437); color:#fff }
+.net .advice { margin-top:3px }
 .dev { display:flex; align-items:center; gap:14px; padding:16px;
   border-top:1px solid var(--divider-color) }
 .dev:first-of-type { border-top:none }
@@ -504,17 +508,44 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
-  async _loadReport() {
-    this._report = "loading";
+  async _loadReport(checkCloud) {
+    this._report = checkCloud ? "checking" : "loading";
+    this._render();
     try {
       const result = await this._hass.callService(
-        "tuya_selfhost", "network_report", {}, undefined, false, true
+        "tuya_selfhost",
+        "network_report",
+        { check_cloud: !!checkCloud },
+        undefined,
+        false,
+        true
       );
-      this._report = (result && result.response && result.response.devices) || [];
+      const answer = (result && result.response) || {};
+      this._report = answer.devices || [];
+      this._cloudAt = answer.cloud_at || null;
+      this._cloudError = answer.cloud_error || null;
     } catch (err) {
       this._report = [];
+      this._cloudError = "failed";
     }
     this._render();
+  }
+
+  _netStatus(device) {
+    if (!device.local) return ["net_silent", "bad"];
+    if (device.cloud === "online")
+      return ["net_online", device.block_recommended ? "warn" : ""];
+    if (device.cloud === "offline") return ["net_cut", "good"];
+    return ["net_unchecked", ""];
+  }
+
+  // Only the exceptions earn a line of their own; for the rest the pill says it,
+  // and eleven copies of the same sentence are harder to read than none.
+  _netAdvice(device) {
+    if (!device.local) return "net_silent_help";
+    if (device.role === "gateway") return "net_keep_online";
+    if (device.role === "sub-device") return "net_via_gateway";
+    return null;
   }
 
   async _alexaLoad() {
@@ -635,58 +666,100 @@ class TuyaSelfhostPanel extends HTMLElement {
     box.appendChild(head);
 
     if (this._report === undefined) {
-      this._report = "loading";
       setTimeout(() => this._loadReport(), 0);
+      this._report = "loading";
     }
     const body = document.createElement("div");
     body.className = "block";
-    if (this._report === "loading" || this._report === undefined) {
-      body.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
+    if (this._report === "loading" || this._report === "checking") {
+      body.innerHTML = `<div class="muted">${this._t(
+        this._report === "checking" ? "checking" : "loading"
+      )}</div>`;
       box.appendChild(body);
       return box;
     }
 
     for (const device of this._report) {
+      const [label, tone] = this._netStatus(device);
+      const advice = this._netAdvice(device);
       const row = document.createElement("div");
       row.className = "net";
-      const pill = device.block_recommended ? "on" : "";
       row.innerHTML = `
         <div class="grow">
           <div>${device.name}</div>
           <div class="muted mono">${device.host || "—"} · ${
             device.mac || this._t("no_mac")
           }</div>
+          ${
+            advice
+              ? `<div class="muted advice">${this._t(advice)}</div>`
+              : ""
+          }
         </div>
-        <span class="pill ${pill}">${
-          device.block_recommended ? this._t("block_yes") : this._t("block_no")
-        }</span>`;
+        <span class="pill ${tone}">${this._t(label)}</span>`;
       body.appendChild(row);
     }
     box.appendChild(body);
 
     const foot = document.createElement("div");
     foot.className = "block";
-    foot.innerHTML = `<div class="muted">${this._t("mac_hint")}</div>`;
+    let note = this._t("check_why");
+    if (this._cloudError === "login") note = this._t("check_login");
+    else if (this._cloudError === "failed") note = this._t("check_failed");
+    else if (this._cloudAt)
+      note = this._t("checked_at", { when: this._when(this._cloudAt) });
+    foot.innerHTML = `<div class="muted">${note}</div>
+      <div class="muted" style="margin-top:6px">${this._t("mac_hint")}</div>`;
+
+    const check = document.createElement("button");
+    check.className = "act";
+    check.style.margin = "10px 8px 0 0";
+    check.textContent = this._t(
+      this._cloudError === "login" ? "check_login_go" : "check_cloud"
+    );
+    check.addEventListener("click", () => {
+      if (this._cloudError === "login") {
+        this._cloudError = null;
+        this._navigate("/config/integrations/dashboard/add?domain=tuya_selfhost");
+        return;
+      }
+      this._loadReport(true);
+    });
+
     const macs = this._report
       .filter((d) => d.block_recommended && d.mac)
       .map((d) => `${d.mac}  ${d.name}`)
       .join("\n");
     const copy = document.createElement("button");
-    copy.className = "act";
-    copy.style.margin = "10px 8px 0 0";
+    copy.className = "act ghost";
+    copy.style.marginTop = "10px";
     copy.textContent = this._t("copy_macs");
     copy.disabled = !macs;
     copy.addEventListener("click", () => this._copy(macs, this._t("copied")));
+
     const again = document.createElement("button");
     again.className = "act ghost";
+    again.style.marginTop = "10px";
     again.textContent = this._t("refresh");
-    again.addEventListener("click", () => {
-      this._report = undefined;
-      this._render();
-    });
-    foot.append(copy, again);
+    again.addEventListener("click", () => this._loadReport());
+
+    foot.append(check, copy, again);
     box.appendChild(foot);
     return box;
+  }
+
+  _when(iso) {
+    const when = new Date(iso);
+    if (isNaN(when)) return iso;
+    const lang =
+      (this._hass && this._hass.locale && this._hass.locale.language) ||
+      navigator.language;
+    return when.toLocaleString(lang, {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
 
   _tabAlexa() {

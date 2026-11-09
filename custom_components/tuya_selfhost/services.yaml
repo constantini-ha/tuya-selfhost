@@ -22,7 +22,11 @@ send_learned_ir_command:
             domain: infrared
 
 network_report:
-  fields: {}
+  fields:
+    check_cloud:
+      default: false
+      selector:
+        boolean:
 
 alexa_config:
   fields: {}

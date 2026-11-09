@@ -38,6 +38,7 @@ from .helpers.device_config import get_config
 from .helpers.discovery import async_start_discovery, async_stop_discovery
 from .ble.autodetect import async_detect_reserve
 from .remote_card import async_setup_remote_card
+from .cloud import async_restore_auth
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -1011,6 +1012,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # reconfiguration. Safe to call repeatedly; only one sweeper is started.
     await async_start_discovery(hass)
     await async_setup_remote_card(hass)
+    await async_restore_auth(hass)
     config = {**entry.data, **entry.options, "name": entry.title}
     try:
         device = await hass.async_add_executor_job(setup_device, hass, config)

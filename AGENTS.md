@@ -162,6 +162,36 @@ contradicts your instinct, trust the note.
   wrong one to inherit. The power switch then takes `_attr_name = None` and
   reads as the control; a key takes its own name and reads "<control> <key>".
 
+### Cutting the cloud off, and knowing whether it worked
+
+- The Network tab of the panel exists to get a device off the internet for good:
+  it is set up locally here, so the only thing the cloud still gets is a
+  description of your home. `network_report` lists every entry with its IP and
+  the MAC from the ARP table, and says which ones are safe to block — a gateway
+  is not, because its sub-devices reach it through the cloud.
+- **Nothing on the LAN can tell you whether a device still has internet.** A
+  device cut off at the router keeps answering us perfectly: same ARP, same
+  port 6668, same state. The LAN discovery broadcast does not help either — its
+  `active` field is 2 on every device whether or not the cloud is reachable, and
+  `token`/`wf_cfg` describe the pairing method, not a live connection.
+- **Tuya is the only side that can see it**, because the device's cloud session
+  either reaches Tuya or it does not. `Cloud.async_online_map()` reads
+  `device.online` from the account's device list; `network_report` with
+  `check_cloud: true` maps that onto the config entries and stores the answer.
+  Cloud offline plus answering locally is a block that worked; not answering
+  locally means the rule cut the device off entirely, not just its internet.
+- The answer is stored (`tuya_selfhost_cloud_status`), so the status survives a
+  restart even though asking again needs a live login.
+- **The cloud login is now persisted** in `tuya_selfhost_cloud_auth`. It used to
+  live only in `hass.data[DOMAIN]["auth_cache"]`, which made a verification a
+  QR scan away every time Home Assistant restarted. `TokenListener.update_token`
+  writes refreshed tokens back, or the stored login would die at expiry — and it
+  runs on an executor thread, so the save goes through `call_soon_threadsafe`.
+- A per-row sentence that repeats eleven times is noise, not help. The pill
+  carries the state; the line underneath appears only for the exceptions worth
+  reading: no answer, a gateway to leave online, a sub-device with no address of
+  its own.
+
 ### Alexa
 
 - `button` maps to `AlexaSceneController` (no deactivation), display category
