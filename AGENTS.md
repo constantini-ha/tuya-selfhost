@@ -206,6 +206,18 @@ contradicts your instinct, trust the note.
 
 ### Bluetooth
 
+- **Detection belongs to the transport, not to the device.** `_switch_transport`
+  used to clear `_api_protocol_working` and `_api_protocol_version_index`, so
+  coming back to Wi-Fi meant walking 3.1 through 3.5 again. A device that
+  blinked for one poll then spent minutes swapping back and forth while being
+  perfectly reachable the whole time. Each transport now keeps its own state.
+- When a device looks lost, prove it from outside Home Assistant before touching
+  the code: listen for the UDP broadcast on 6666/6667 (AES-ECB with
+  `md5(b"yGAdlopoPVldABfn")`) to see which device id is at which address, then
+  open a `tinytuya` session with the stored key. Twice now that has shown the
+  device to be fine and the integration to be the one at fault.
+
+
 - Tuya combo modules advertise service `0000a201` at **the Wi-Fi MAC plus one**.
 - The uuid is in the advertisement; `key = md5(service_data[1:])`, then AES-128-CBC
   (key used as iv) over `manufacturer_data[6:]`. `service_data[0]` is 0 for a

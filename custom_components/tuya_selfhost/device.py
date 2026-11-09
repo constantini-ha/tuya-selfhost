@@ -91,6 +91,7 @@ class TuyaLocalDevice(object):
         self._api_protocol_version_index = None
         self._api_protocol_working = False
         self._api_standby = None
+        self._standby_detect = (False, None)
         self._api_working_protocol_failures = 0
         self.dev_cid = dev_cid
         try:
@@ -532,9 +533,15 @@ class TuyaLocalDevice(object):
         """
         if self._api_standby is None:
             return
+        # Detection belongs to the transport, not to the device: coming back to
+        # Wi-Fi must not mean walking 3.1 through 3.5 again, which takes long
+        # enough that a brief hiccup turns into minutes of swapping.
+        mine = (self._api_protocol_working, self._api_protocol_version_index)
         self._api, self._api_standby = self._api_standby, self._api
-        self._api_protocol_working = False
-        self._api_protocol_version_index = None
+        self._api_protocol_working, self._api_protocol_version_index = (
+            self._standby_detect
+        )
+        self._standby_detect = mine
         _LOGGER.warning(
             "%s unreachable; trying it over %s instead",
             self.name,
