@@ -141,6 +141,22 @@ contradicts your instinct, trust the note.
 
 ### Home Assistant traps that cost real debugging time
 
+- **`has_returned_state` means "ever", not "still".** It reads the cached
+  state, and the cache outlives the device: a switch that fell off the network
+  hours ago still reports true. Anything asking "is this device still there"
+  must use `is_responding`, which requires a refresh within several times
+  `_CACHE_TIMEOUT`. Getting this wrong once stranded a switch for eleven hours —
+  the discovery sweep skips entries it believes are reachable, so the one device
+  that was working at the moment the router reshuffled every address was the one
+  it never went looking for.
+- A DHCP reshuffle moves every device at once. The sweep handles it, but only
+  for entries it considers unreachable, which is why the staleness test above is
+  what makes the recovery work at all.
+- Known and unfixed: the sweep once accepted `192.168.0.3` — an address from a
+  subnet this network does not use — for a device, and corrected itself two
+  minutes later. Nothing validates that a discovered address is on the same
+  network as Home Assistant.
+
 - **Mark dispatcher and timer handlers with `@callback`.** Without it Home
   Assistant runs them in a `SyncWorker` thread and any `async_create_task` from
   there raises `RuntimeError: ... from a thread other than the event loop`. This

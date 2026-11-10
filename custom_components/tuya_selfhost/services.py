@@ -264,7 +264,7 @@ async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
                 "role": role,
                 "block_recommended": role == "device",
                 "note": note,
-                "local": bool(device and device.has_returned_state),
+                "local": bool(device and device.is_responding),
                 "cloud": "unknown"
                 if reaches_cloud is None
                 else ("online" if reaches_cloud else "offline"),

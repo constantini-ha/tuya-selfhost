@@ -125,9 +125,11 @@ class TuyaLANRediscovery:
                 continue
             bucket = domain_data.get(get_device_id(entry.data))
             device = bucket.get("device") if bucket else None
-            # No device object yet (setup not complete / failed) or it has not
-            # returned state recently -> treat as unreachable and worth a scan.
-            if device is not None and device.has_returned_state:
+            # No device object yet (setup not complete / failed) or it has gone
+            # quiet -> treat as unreachable and worth a scan. Asking whether it
+            # ever answered skips every device that moved while it was working,
+            # which is exactly when a DHCP reshuffle strands one.
+            if device is not None and device.is_responding:
                 continue
             yield entry, device_id
 

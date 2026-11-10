@@ -207,6 +207,17 @@ class TuyaLocalDevice(object):
         cached = self._get_cached_state()
         return len(cached) > 1 or cached.get("updated_at", 0) > 0
 
+    @property
+    def is_responding(self):
+        """Whether the device is still answering, not whether it ever did.
+
+        The cached state outlives the device, so has_returned_state stays true
+        for a switch that fell off the network hours ago. A healthy one
+        refreshes within _CACHE_TIMEOUT, so several times that is silence.
+        """
+        updated = self._get_cached_state().get("updated_at", 0)
+        return bool(updated) and time() - updated < self._CACHE_TIMEOUT * 4
+
     @callback
     def actually_start(self, event=None):
         _LOGGER.debug("Starting monitor loop for %s", self.name)
