@@ -259,6 +259,18 @@ contradicts your instinct, trust the note.
 - The first status read comes back empty; wait `STATUS_SETTLE_STEPS` before
   deciding a device is mute.
 
+### Releasing
+
+- This checkout has two remotes, and `gh` resolves to the **upstream**
+  (`make-all/tuya-local`), not to the fork. A release created without
+  `--repo constantini-ha/tuya-selfhost` is refused with a misleading message
+  about a missing `workflow` scope. Always pass `--repo`, and `--target main`.
+- Bump `manifest.json` in the same commit as the change, not afterwards: a
+  release whose manifest names the previous version cannot be fixed without
+  moving a published tag.
+- Release notes are written in English, Portuguese and Spanish, in that order,
+  separated by `---`.
+
 ### Testing the frontend
 
 - Playwright drives the real Home Assistant. Browsers live in
