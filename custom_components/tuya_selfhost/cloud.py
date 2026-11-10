@@ -181,26 +181,6 @@ class Cloud:
             TokenListener(self.__hass),
         )
 
-    async def async_online_map(self) -> dict[str, bool]:
-        """Ask Tuya which of the account's devices are still reaching it.
-
-        Tuya is the only side that can see a device's internet: a device cut off
-        at the router still answers us on the LAN, so the cloud's own view is
-        what tells a working block apart from a dead device.
-        """
-        manager = self._manager()
-        await self.__hass.async_add_executor_job(manager.update_device_cache)
-        online: dict[str, bool] = {}
-        for device in manager.device_map.values():
-            for key in (
-                device.id,
-                getattr(device, "uuid", None),
-                getattr(device, "node_id", None),
-            ):
-                if key:
-                    online[key] = bool(device.online)
-        return online
-
     async def async_get_devices(self) -> dict[str, Any]:
         """Get all devices associated with the account."""
         manager = self._manager()

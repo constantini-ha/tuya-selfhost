@@ -512,7 +512,6 @@ class TuyaSelfhostPanel extends HTMLElement {
         this._cloud = { authenticated: true };
         this._flash = this._t("cloud_done");
         this._render();
-        if (this._config === "network") this._loadReport(true);
         return;
       }
       this._login.tries += 1;
@@ -807,35 +806,29 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
-  async _loadReport(checkCloud) {
-    this._report = checkCloud ? "checking" : "loading";
+  async _loadReport() {
+    this._report = "loading";
     this._render();
     try {
       const result = await this._hass.callService(
         "tuya_selfhost",
         "network_report",
-        { check_cloud: !!checkCloud },
+        {},
         undefined,
         false,
         true
       );
-      const answer = (result && result.response) || {};
-      this._report = answer.devices || [];
-      this._cloudAt = answer.cloud_at || null;
-      this._cloudError = answer.cloud_error || null;
+      this._report = ((result && result.response) || {}).devices || [];
     } catch (err) {
       this._report = [];
-      this._cloudError = "failed";
     }
     this._render();
   }
 
+  // Whether it answers us here. Whether it still reaches the internet is a
+  // question only Tuya can answer, and it is not worth an account to ask.
   _netStatus(device) {
-    if (!device.local) return ["net_silent", "bad"];
-    if (device.cloud === "online")
-      return ["net_online", device.block_recommended ? "warn" : ""];
-    if (device.cloud === "offline") return ["net_cut", "good"];
-    return ["net_unchecked", ""];
+    return device.local ? ["net_here", "good"] : ["net_silent", "bad"];
   }
 
   // Only the exceptions earn a line of their own; for the rest the pill says it,
@@ -979,10 +972,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     const body = document.createElement("div");
     body.className = "block";
-    if (this._report === "loading" || this._report === "checking") {
-      body.innerHTML = `<div class="muted">${this._t(
-        this._report === "checking" ? "checking" : "loading"
-      )}</div>`;
+    if (this._report === "loading") {
+      body.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
       box.appendChild(body);
       return box;
     }
@@ -1011,30 +1002,7 @@ class TuyaSelfhostPanel extends HTMLElement {
 
     const foot = document.createElement("div");
     foot.className = "block";
-    // An expired token is no account at all, whatever the panel last heard.
-    const signedIn =
-      !!(this._cloud && this._cloud.authenticated) && this._cloudError !== "login";
-    let check = null;
-    if (signedIn) {
-      let note = this._t("check_why");
-      if (this._cloudError === "failed") note = this._t("check_failed");
-      else if (this._cloudAt)
-        note = this._t("checked_at", { when: this._when(this._cloudAt) });
-      foot.innerHTML = `<div class="muted">${note}</div>`;
-      check = document.createElement("button");
-      check.className = "act";
-      check.style.margin = "10px 8px 0 0";
-      check.textContent = this._t("check_cloud");
-      check.addEventListener("click", () => this._loadReport(true));
-    } else {
-      // The sign-in belongs where it is asked for, not behind a form that adds
-      // a device nobody wanted.
-      foot.appendChild(this._loginBox(true));
-    }
-    foot.insertAdjacentHTML(
-      "beforeend",
-      `<div class="muted" style="margin-top:10px">${this._t("mac_hint")}</div>`
-    );
+    foot.innerHTML = `<div class="muted">${this._t("mac_hint")}</div>`;
 
     const macs = this._report
       .filter((d) => d.block_recommended && d.mac)
@@ -1053,7 +1021,6 @@ class TuyaSelfhostPanel extends HTMLElement {
     again.textContent = this._t("refresh");
     again.addEventListener("click", () => this._loadReport());
 
-    if (check) foot.appendChild(check);
     foot.append(copy, again);
     box.appendChild(foot);
     return box;

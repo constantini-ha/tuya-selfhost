@@ -16,10 +16,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import service
-from homeassistant.helpers.storage import Store
-from homeassistant.util import dt as dt_util
 
-from .cloud import Cloud
 from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .device import get_device_id
 from .helpers.arp import arp_table
@@ -69,7 +66,7 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
         DOMAIN,
         "network_report",
         partial(async_handle_network_report, hass),
-        schema=vol.Schema({vol.Optional("check_cloud", default=False): cv.boolean}),
+        schema=vol.Schema({}),
         supports_response=SupportsResponse.ONLY,
     )
     return True
@@ -186,43 +183,8 @@ def _host_sort_key(device: dict) -> list[int]:
     return [999, 999, 999, 999]
 
 
-CLOUD_STORE_KEY = "tuya_selfhost_cloud_status"
-CLOUD_STORE_VERSION = 1
-
-
-def _cloud_store(hass: HomeAssistant) -> Store:
-    data = hass.data.setdefault(DOMAIN, {})
-    if "cloud_status_store" not in data:
-        data["cloud_status_store"] = Store(hass, CLOUD_STORE_VERSION, CLOUD_STORE_KEY)
-    return data["cloud_status_store"]
-
-
-async def _async_cloud_online(
-    hass: HomeAssistant, entries
-) -> tuple[dict | None, str | None]:
-    """Ask Tuya which entries are still reaching it, keyed by entry id."""
-    cloud = Cloud(hass)
-    if not cloud.is_authenticated:
-        return None, "login"
-    try:
-        online = await cloud.async_online_map()
-    except Exception as err:  # the cloud is optional; never break the report
-        _LOGGER.warning("Could not read device status from Tuya: %s", err)
-        return None, "failed"
-
-    found = {}
-    for entry in entries:
-        config = {**entry.data, **entry.options}
-        for key in (config.get(CONF_DEVICE_CID), config.get(CONF_DEVICE_ID)):
-            if key and key in online:
-                found[entry.entry_id] = online[key]
-                break
-    return found, None
-
-
 async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
-    """List configured devices with their MAC, whether they answer here, and
-    whether Tuya can still see them."""
+    """List configured devices with their MAC and whether they answer here."""
     arp = await hass.async_add_executor_job(arp_table)
     entries = hass.config_entries.async_entries(DOMAIN)
     gateways = {
@@ -230,16 +192,6 @@ async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
         for entry in entries
         if entry.data.get(CONF_DEVICE_CID)
     }
-
-    store = _cloud_store(hass)
-    stored = await store.async_load() or {}
-    error = None
-    if call.data.get("check_cloud"):
-        fresh, error = await _async_cloud_online(hass, entries)
-        if fresh is not None:
-            stored = {"at": dt_util.utcnow().isoformat(), "entries": fresh}
-            await store.async_save(stored)
-    seen = stored.get("entries") or {}
 
     devices = []
     for entry in entries:
@@ -254,7 +206,6 @@ async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
             role, note = "device", "controlled locally"
         runtime = (hass.data.get(DOMAIN) or {}).get(get_device_id(config)) or {}
         device = runtime.get("device")
-        reaches_cloud = seen.get(entry.entry_id)
         devices.append(
             {
                 "name": entry.title,
@@ -265,14 +216,11 @@ async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
                 "block_recommended": role == "device",
                 "note": note,
                 "local": bool(device and device.is_responding),
-                "cloud": "unknown"
-                if reaches_cloud is None
-                else ("online" if reaches_cloud else "offline"),
             }
         )
 
     devices.sort(key=_host_sort_key)
-    return {"devices": devices, "cloud_at": stored.get("at"), "cloud_error": error}
+    return {"devices": devices}
 
 
 async def async_handle_send_ir_command(entity, call: ServiceCall):

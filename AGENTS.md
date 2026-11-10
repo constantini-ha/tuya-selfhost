@@ -191,13 +191,14 @@ contradicts your instinct, trust the note.
   `active` field is 2 on every device whether or not the cloud is reachable, and
   `token`/`wf_cfg` describe the pairing method, not a live connection.
 - **Tuya is the only side that can see it**, because the device's cloud session
-  either reaches Tuya or it does not. `Cloud.async_online_map()` reads
-  `device.online` from the account's device list; `network_report` with
-  `check_cloud: true` maps that onto the config entries and stores the answer.
-  Cloud offline plus answering locally is a block that worked; not answering
-  locally means the rule cut the device off entirely, not just its internet.
-- The answer is stored (`tuya_selfhost_cloud_status`), so the status survives a
-  restart even though asking again needs a live login.
+  either reaches Tuya or it does not. That check was built, shipped and then
+  removed: it cost a cloud account to answer a question the user was happy to
+  answer by looking at their router, and every row said "not checked" until
+  somebody logged in. The tab now says only whether a device answers *us*, which
+  is what it can honestly know. Do not rebuild it without a reason the user
+  asked for; `device.online` from `tuya_sharing`'s device list is where it was.
+- What remains of that work and still earns its place: `is_responding`, which
+  caught two dead switches in one afternoon.
 - **The cloud login is now persisted** in `tuya_selfhost_cloud_auth`. It used to
   live only in `hass.data[DOMAIN]["auth_cache"]`, which made a verification a
   QR scan away every time Home Assistant restarted. `TokenListener.update_token`
@@ -207,11 +208,12 @@ contradicts your instinct, trust the note.
   carries the state; the line underneath appears only for the exceptions worth
   reading: no answer, a gateway to leave online, a sub-device with no address of
   its own.
-- **Sign in where you ask people to sign in.** The Network tab used to send
-  them to `/config/integrations/dashboard/add`, a form that adds a device, to
-  get an account it needed for a check — and they rightly asked what the login
-  was even for. `cloud_api.py` serves `cloud/status`, `cloud/qr`, `cloud/login`
-  and `cloud/logout`, so the panel runs the whole QR dance in place.
+- **Sign in where you ask people to sign in.** Getting a Tuya account used to
+  mean `/config/integrations/dashboard/add` — a form that adds a device — so
+  people rightly asked what the login was even for. `cloud_api.py` serves
+  `cloud/status`, `cloud/qr`, `cloud/login` and `cloud/logout`, and the add tab
+  runs the whole QR dance in place, beside the manual form and looking like it.
+  Signing in there also makes the add flow skip the code next time.
 - **A poll must not call `async_login`.** It clears the stored account on every
   failure, which is right for a form someone just submitted and ruinous four
   seconds at a time while the code is still on screen. `async_poll_login` shares
