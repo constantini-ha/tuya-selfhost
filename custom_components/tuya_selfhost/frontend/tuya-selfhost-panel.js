@@ -3,6 +3,11 @@ import { t } from "./i18n.js";
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
 const LAYOUT_SUB = "tuya_selfhost/layout/subscribe";
+const CLOUD_STATUS = "tuya_selfhost/cloud/status";
+const CLOUD_QR = "tuya_selfhost/cloud/qr";
+const CLOUD_LOGIN = "tuya_selfhost/cloud/login";
+const CLOUD_LOGOUT = "tuya_selfhost/cloud/logout";
+const ZHA_DEVICES = "zha/devices";
 
 const ICONS = [
   "mdi:power", "mdi:snowflake", "mdi:snowflake-melt", "mdi:fan",
@@ -44,6 +49,8 @@ ha-card { margin-bottom:16px; overflow:hidden }
 .pill.warn { background:var(--warning-color,#ffa726); color:#111 }
 .pill.bad { background:var(--error-color,#db4437); color:#fff }
 .net .advice { margin-top:3px }
+.qr { display:flex; justify-content:center; padding:8px 0 4px }
+.qr svg { border-radius:10px }
 .dev { display:flex; align-items:center; gap:14px; padding:16px;
   border-top:1px solid var(--divider-color) }
 .dev:first-of-type { border-top:none }
@@ -199,8 +206,42 @@ class TuyaSelfhostPanel extends HTMLElement {
       const stored = await this._hass.callWS({ type: LAYOUT_GET, key: remote });
       this._layouts[remote] = (stored && stored.controls) || [];
     }
+    await this._loadZigbee();
+    await this._cloudStatus();
     this._render();
     this._watch();
+  }
+
+  async _loadZigbee() {
+    // Zigbee devices belong to Home Assistant's own integration, but they are
+    // devices in this house like any other, so they belong in this list too.
+    this._zigbee = [];
+    try {
+      const devices = await this._hass.callWS({ type: ZHA_DEVICES });
+      for (const device of devices || []) {
+        if (device.active_coordinator) continue;
+        const id = "zha:" + device.ieee;
+        this._zigbee.push({
+          entry_id: id,
+          title: device.user_given_name || device.name,
+          zha: device,
+        });
+        this._byEntry[id] = (device.entities || []).map((e) => ({
+          entity_id: e.entity_id,
+        }));
+      }
+    } catch (err) {
+      this._zigbee = [];
+      this._noZigbee = true;
+    }
+  }
+
+  async _cloudStatus() {
+    try {
+      this._cloud = await this._hass.callWS({ type: CLOUD_STATUS });
+    } catch (err) {
+      this._cloud = { authenticated: false };
+    }
   }
 
   async _watch() {
@@ -233,6 +274,8 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._unwatch();
       this._unwatch = null;
     }
+    clearTimeout(this._loginTimer);
+    clearTimeout(this._pairTimer);
   }
 
   // ---------- data helpers ----------
@@ -245,6 +288,8 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   _entry() {
+    if (this._open && this._open.startsWith("zha:"))
+      return (this._zigbee || []).find((d) => d.entry_id === this._open);
     return this._entries.find((e) => e.entry_id === this._open);
   }
 
@@ -394,11 +439,19 @@ class TuyaSelfhostPanel extends HTMLElement {
   async _deviceToDashboard() {
     const entry = this._entry();
     const config = await this._hass.callWS({ type: "lovelace/config", url_path: null });
-    const card = {
-      type: "custom:tuya-selfhost-device-card",
-      entry_id: entry.entry_id,
-      title: entry.title,
-    };
+    const card = entry.zha
+      ? {
+          type: "custom:tuya-selfhost-device-card",
+          entities: (this._byEntry[entry.entry_id] || [])
+            .map((e) => e.entity_id)
+            .filter((id) => id.startsWith("switch.") || id.startsWith("light.")),
+          title: entry.title,
+        }
+      : {
+          type: "custom:tuya-selfhost-device-card",
+          entry_id: entry.entry_id,
+          title: entry.title,
+        };
     const view = config.views[0];
     if (view.sections) view.sections.push({ type: "grid", cards: [card] });
     else (view.cards ||= []).push(card);
@@ -422,6 +475,252 @@ class TuyaSelfhostPanel extends HTMLElement {
     await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
     this._flash = this._t("sent_to_dashboard", { name: control.name });
     this._render();
+  }
+
+  // ---------- Tuya account ----------
+
+  async _cloudQr(userCode) {
+    this._login = { busy: true, user_code: userCode };
+    this._render();
+    try {
+      const result = await this._hass.callWS({
+        type: CLOUD_QR,
+        user_code: userCode,
+      });
+      this._login = result.error
+        ? { failed: result.error, user_code: userCode }
+        : { rows: result.rows, tries: 0, user_code: userCode };
+      if (this._login.rows) this._pollLogin();
+    } catch (err) {
+      this._login = { failed: err.message || String(err), user_code: userCode };
+    }
+    this._render();
+  }
+
+  _pollLogin() {
+    clearTimeout(this._loginTimer);
+    this._loginTimer = setTimeout(async () => {
+      if (!this._login || !this._login.rows) return;
+      let result = {};
+      try {
+        result = await this._hass.callWS({ type: CLOUD_LOGIN });
+      } catch (err) {
+        result = {};
+      }
+      if (result.ok) {
+        this._login = null;
+        this._cloud = { authenticated: true };
+        this._flash = this._t("cloud_done");
+        this._render();
+        if (this._config === "network") this._loadReport(true);
+        return;
+      }
+      this._login.tries += 1;
+      // Tuya's code lasts a few minutes; after that only a new one gets you in.
+      if (this._login.tries > 40) {
+        this._login = { expired: true, user_code: this._login.user_code };
+        this._render();
+        return;
+      }
+      this._pollLogin();
+    }, 4000);
+  }
+
+  async _cloudLogout() {
+    clearTimeout(this._loginTimer);
+    try {
+      await this._hass.callWS({ type: CLOUD_LOGOUT });
+    } catch (err) {
+      /* the account is gone either way as far as this panel is concerned */
+    }
+    this._cloud = { authenticated: false };
+    this._login = null;
+    this._render();
+  }
+
+  _qrSquare(rows) {
+    const size = rows.length;
+    let path = "";
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++)
+        if (rows[y][x] === "1") path += `M${x} ${y}h1v1h-1z`;
+    const wrap = document.createElement("div");
+    wrap.className = "qr";
+    // Always dark on white: a scanner needs the contrast, whatever the theme.
+    wrap.innerHTML = `<svg viewBox="-2 -2 ${size + 4} ${size + 4}" width="212" height="212"
+      shape-rendering="crispEdges" role="img"><rect x="-2" y="-2" width="${size + 4}"
+      height="${size + 4}" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+    return wrap;
+  }
+
+  _loginBox(explain) {
+    const box = document.createElement("div");
+    const login = this._login || {};
+
+    if (this._cloud && this._cloud.authenticated && !login.rows) {
+      box.innerHTML = `<div class="muted">${this._t("cloud_connected")}</div>`;
+      const out = document.createElement("button");
+      out.className = "act ghost";
+      out.style.marginTop = "10px";
+      out.textContent = this._t("cloud_logout");
+      out.addEventListener("click", () => this._cloudLogout());
+      box.appendChild(out);
+      return box;
+    }
+
+    if (login.busy) {
+      box.innerHTML = `<div class="muted">${this._t("cloud_asking")}</div>`;
+      return box;
+    }
+
+    if (login.rows) {
+      box.appendChild(this._qrSquare(login.rows));
+      box.insertAdjacentHTML(
+        "beforeend",
+        `<div class="muted">${this._t("cloud_scan")}</div>
+         <div class="muted" style="margin-top:6px">${this._t("cloud_waiting")}</div>`
+      );
+      const cancel = document.createElement("button");
+      cancel.className = "act ghost";
+      cancel.style.marginTop = "10px";
+      cancel.textContent = this._t("cloud_cancel");
+      cancel.addEventListener("click", () => {
+        clearTimeout(this._loginTimer);
+        this._login = null;
+        this._render();
+      });
+      box.appendChild(cancel);
+      return box;
+    }
+
+    box.innerHTML = explain ? `<div class="muted">${this._t("cloud_why")}</div>` : "";
+    if (login.expired || login.failed) {
+      const problem = document.createElement("div");
+      problem.className = "muted";
+      problem.style.marginTop = "8px";
+      problem.textContent = login.expired
+        ? this._t("cloud_expired")
+        : this._t("cloud_failed", { err: login.failed });
+      box.appendChild(problem);
+    }
+    const field = document.createElement("div");
+    field.className = "row";
+    field.style.marginTop = "12px";
+    const input = document.createElement("input");
+    input.className = "grow";
+    input.placeholder = this._t("cloud_user_code");
+    input.value = login.user_code || (this._cloud && this._cloud.user_code) || "";
+    const go = document.createElement("button");
+    go.className = "act";
+    go.textContent = this._t("cloud_enter");
+    const start = () => {
+      const code = input.value.trim();
+      if (code) this._cloudQr(code);
+    };
+    go.addEventListener("click", start);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") start();
+    });
+    field.append(input, go);
+    box.appendChild(field);
+    box.insertAdjacentHTML(
+      "beforeend",
+      `<div class="muted" style="margin-top:8px">${this._t("cloud_where")}</div>`
+    );
+    return box;
+  }
+
+  // ---------- Zigbee ----------
+
+  async _permit() {
+    try {
+      await this._hass.callService("zha", "permit", { duration: 120 });
+    } catch (err) {
+      this._flash = this._t("zigbee_failed", { err: err.message || err });
+      this._render();
+      return;
+    }
+    this._pairing = {
+      left: 120,
+      found: [],
+      before: new Set((this._zigbee || []).map((d) => d.entry_id)),
+    };
+    this._render();
+    this._pairTick();
+  }
+
+  _pairTick() {
+    clearTimeout(this._pairTimer);
+    this._pairTimer = setTimeout(async () => {
+      if (!this._pairing) return;
+      this._pairing.left -= 5;
+      await this._loadZigbee();
+      for (const device of this._zigbee) {
+        if (
+          !this._pairing.before.has(device.entry_id) &&
+          !this._pairing.found.includes(device.title)
+        )
+          this._pairing.found.push(device.title);
+      }
+      if (this._pairing.left > 0) {
+        this._render();
+        this._pairTick();
+        return;
+      }
+      const found = this._pairing.found;
+      this._pairing = null;
+      this._flash = found.length
+        ? this._t("zigbee_joined", { names: found.join(", ") })
+        : this._t("zigbee_none");
+      this._render();
+    }, 5000);
+  }
+
+  async _stopPermit() {
+    clearTimeout(this._pairTimer);
+    const found = (this._pairing && this._pairing.found) || [];
+    this._pairing = null;
+    try {
+      await this._hass.callService("zha", "permit", { duration: 0 });
+    } catch (err) {
+      /* the window closes on its own anyway */
+    }
+    if (found.length) this._flash = this._t("zigbee_joined", { names: found.join(", ") });
+    this._render();
+  }
+
+  async _zigbeeRemove(device) {
+    try {
+      await this._hass.callService("zha", "remove", { ieee: device.zha.ieee });
+      this._flash = this._t("zigbee_removed", { name: device.title });
+    } catch (err) {
+      this._flash = this._t("zigbee_failed", { err: err.message || err });
+    }
+    this._confirmZigbee = null;
+    await this._loadZigbee();
+    this._render();
+  }
+
+  _batteryOf(device) {
+    for (const item of this._byEntry[device.entry_id] || []) {
+      const state = this._hass.states[item.entity_id];
+      if (state && state.attributes.device_class === "battery") {
+        const value = Number(state.state);
+        if (!isNaN(value)) return Math.round(value);
+      }
+    }
+    return null;
+  }
+
+  _zigbeeFacts(device) {
+    const info = device.zha;
+    const facts = [];
+    if (info.model) facts.push(info.model);
+    if (info.lqi !== null && info.lqi !== undefined)
+      facts.push(this._t("zigbee_signal", { n: Math.round((Number(info.lqi) / 255) * 100) }));
+    const battery = this._batteryOf(device);
+    if (battery !== null) facts.push(this._t("zigbee_battery", { n: battery }));
+    return facts.join(" · ");
   }
 
   // ---------- rendering ----------
@@ -475,7 +774,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       return;
     }
 
-    if (!this._entries || !this._entries.length) {
+    if (!(this._entries || []).length && !(this._zigbee || []).length) {
       wrap.innerHTML += `<ha-card><div class="pad">${this._t("no_devices")}</div></ha-card>`;
     } else if (this._remote) {
       wrap.appendChild(this._renderRemote());
@@ -595,6 +894,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     for (const [id, key] of [
       ["add", "tab_add"],
       ["network", "tab_network"],
+      ["zigbee", "tab_zigbee"],
       ["alexa", "tab_alexa"],
     ]) {
       const tab = document.createElement("button");
@@ -610,6 +910,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     card.appendChild(tabs);
 
     if (this._config === "network") card.appendChild(this._tabNetwork());
+    else if (this._config === "zigbee") card.appendChild(this._tabZigbee());
     else if (this._config === "alexa") card.appendChild(this._tabAlexa());
     else card.appendChild(this._tabAdd());
     return card;
@@ -622,22 +923,29 @@ class TuyaSelfhostPanel extends HTMLElement {
     intro.innerHTML = `<div class="muted">${this._t("add_intro")}</div>`;
     box.appendChild(intro);
 
-    const start = document.createElement("div");
-    start.className = "block";
-    start.innerHTML = `<h3>${this._t("add_cloud")}</h3>
-      <div class="muted">${this._t("add_cloud_text")}</div>
-      <h3 style="margin-top:16px">${this._t("add_local")}</h3>
-      <div class="muted">${this._t("add_local_text")}</div>
-      <div class="muted" style="margin-top:14px">${this._t("add_which")}</div>`;
+    const cloud = document.createElement("div");
+    cloud.className = "block";
+    cloud.innerHTML = `<h3>${this._t("add_cloud")}</h3>
+      <div class="muted">${this._t("add_cloud_text")}</div>`;
+    // The heading above already says what the account is for.
+    const signIn = this._loginBox(false);
+    signIn.style.marginTop = "12px";
+    cloud.appendChild(signIn);
+    box.appendChild(cloud);
+
+    const manual = document.createElement("div");
+    manual.className = "block";
+    manual.innerHTML = `<h3>${this._t("add_local")}</h3>
+      <div class="muted">${this._t("add_local_text")}</div>`;
     const go = document.createElement("button");
     go.className = "act";
-    go.style.marginTop = "14px";
+    go.style.marginTop = "12px";
     go.textContent = this._t("open_flow");
     go.addEventListener("click", () =>
       this._navigate("/config/integrations/dashboard/add?domain=tuya_selfhost")
     );
-    start.appendChild(go);
-    box.appendChild(start);
+    manual.appendChild(go);
+    box.appendChild(manual);
 
     const list = document.createElement("div");
     list.className = "block";
@@ -703,28 +1011,30 @@ class TuyaSelfhostPanel extends HTMLElement {
 
     const foot = document.createElement("div");
     foot.className = "block";
-    let note = this._t("check_why");
-    if (this._cloudError === "login") note = this._t("check_login");
-    else if (this._cloudError === "failed") note = this._t("check_failed");
-    else if (this._cloudAt)
-      note = this._t("checked_at", { when: this._when(this._cloudAt) });
-    foot.innerHTML = `<div class="muted">${note}</div>
-      <div class="muted" style="margin-top:6px">${this._t("mac_hint")}</div>`;
-
-    const check = document.createElement("button");
-    check.className = "act";
-    check.style.margin = "10px 8px 0 0";
-    check.textContent = this._t(
-      this._cloudError === "login" ? "check_login_go" : "check_cloud"
+    // An expired token is no account at all, whatever the panel last heard.
+    const signedIn =
+      !!(this._cloud && this._cloud.authenticated) && this._cloudError !== "login";
+    let check = null;
+    if (signedIn) {
+      let note = this._t("check_why");
+      if (this._cloudError === "failed") note = this._t("check_failed");
+      else if (this._cloudAt)
+        note = this._t("checked_at", { when: this._when(this._cloudAt) });
+      foot.innerHTML = `<div class="muted">${note}</div>`;
+      check = document.createElement("button");
+      check.className = "act";
+      check.style.margin = "10px 8px 0 0";
+      check.textContent = this._t("check_cloud");
+      check.addEventListener("click", () => this._loadReport(true));
+    } else {
+      // The sign-in belongs where it is asked for, not behind a form that adds
+      // a device nobody wanted.
+      foot.appendChild(this._loginBox(true));
+    }
+    foot.insertAdjacentHTML(
+      "beforeend",
+      `<div class="muted" style="margin-top:10px">${this._t("mac_hint")}</div>`
     );
-    check.addEventListener("click", () => {
-      if (this._cloudError === "login") {
-        this._cloudError = null;
-        this._navigate("/config/integrations/dashboard/add?domain=tuya_selfhost");
-        return;
-      }
-      this._loadReport(true);
-    });
 
     const macs = this._report
       .filter((d) => d.block_recommended && d.mac)
@@ -743,7 +1053,120 @@ class TuyaSelfhostPanel extends HTMLElement {
     again.textContent = this._t("refresh");
     again.addEventListener("click", () => this._loadReport());
 
-    foot.append(check, copy, again);
+    if (check) foot.appendChild(check);
+    foot.append(copy, again);
+    box.appendChild(foot);
+    return box;
+  }
+
+  _tabZigbee() {
+    const box = document.createElement("div");
+    const head = document.createElement("div");
+    head.className = "block";
+    head.innerHTML = `<h3>${this._t("zigbee_title")}</h3>
+      <div class="muted">${this._t("zigbee_intro")}</div>`;
+    box.appendChild(head);
+
+    if (this._noZigbee) {
+      box.insertAdjacentHTML(
+        "beforeend",
+        `<div class="block"><div class="muted">${this._t("zigbee_absent")}</div></div>`
+      );
+      return box;
+    }
+
+    const add = document.createElement("div");
+    add.className = "block";
+    if (this._pairing) {
+      add.innerHTML = `<h3>${this._t("zigbee_open")}</h3>
+        <div class="muted">${this._t("zigbee_open_help")}</div>
+        <div class="muted" style="margin-top:6px">${this._t("zigbee_left", {
+          n: this._pairing.left,
+        })}</div>`;
+      if (this._pairing.found.length)
+        add.insertAdjacentHTML(
+          "beforeend",
+          `<div class="muted" style="margin-top:6px">${this._t("zigbee_joined", {
+            names: this._pairing.found.join(", "),
+          })}</div>`
+        );
+      const stop = document.createElement("button");
+      stop.className = "act ghost";
+      stop.style.marginTop = "10px";
+      stop.textContent = this._t("zigbee_stop");
+      stop.addEventListener("click", () => this._stopPermit());
+      add.appendChild(stop);
+    } else {
+      add.innerHTML = `<h3>${this._t("zigbee_add")}</h3>
+        <div class="muted">${this._t("zigbee_add_help")}</div>`;
+      const go = document.createElement("button");
+      go.className = "act";
+      go.style.marginTop = "12px";
+      go.textContent = this._t("zigbee_open_btn");
+      go.addEventListener("click", () => this._permit());
+      add.appendChild(go);
+    }
+    box.appendChild(add);
+
+    const list = document.createElement("div");
+    list.className = "block";
+    list.innerHTML = `<h3>${this._t("zigbee_devices")}</h3>`;
+    if (!(this._zigbee || []).length)
+      list.insertAdjacentHTML(
+        "beforeend",
+        `<div class="muted">${this._t("zigbee_empty")}</div>`
+      );
+    for (const device of this._zigbee || []) {
+      const row = document.createElement("div");
+      row.className = "net";
+      if (this._confirmZigbee === device.entry_id) {
+        row.innerHTML = `<div class="grow"><div class="muted">${this._t(
+          "zigbee_remove_confirm",
+          { name: device.title }
+        )}</div></div>`;
+        const yes = document.createElement("button");
+        yes.className = "act warn";
+        yes.textContent = this._t("yes");
+        yes.addEventListener("click", () => this._zigbeeRemove(device));
+        const no = document.createElement("button");
+        no.className = "act ghost";
+        no.textContent = this._t("no");
+        no.addEventListener("click", () => {
+          this._confirmZigbee = null;
+          this._render();
+        });
+        row.append(yes, no);
+      } else {
+        const gone = device.zha.available === false;
+        row.innerHTML = `<div class="grow">
+            <div>${device.title}</div>
+            <div class="muted">${this._zigbeeFacts(device)}</div>
+          </div>
+          <span class="pill ${gone ? "bad" : "good"}">${this._t(
+            gone ? "zigbee_gone" : "zigbee_here"
+          )}</span>`;
+        const del = document.createElement("button");
+        del.className = "act ghost";
+        del.textContent = this._t("zigbee_remove");
+        del.addEventListener("click", () => {
+          this._confirmZigbee = device.entry_id;
+          this._render();
+        });
+        row.appendChild(del);
+      }
+      list.appendChild(row);
+    }
+    box.appendChild(list);
+
+    const foot = document.createElement("div");
+    foot.className = "block";
+    foot.innerHTML = `<div class="muted">${this._t("zigbee_deeper")}</div>`;
+    const open = document.createElement("button");
+    open.className = "act ghost";
+    open.style.marginTop = "10px";
+    open.textContent = this._t("zigbee_open_ha");
+    open.addEventListener("click", () => this._navigate("/config/zha/dashboard"));
+    foot.appendChild(open);
     box.appendChild(foot);
     return box;
   }
@@ -842,6 +1265,30 @@ class TuyaSelfhostPanel extends HTMLElement {
       row.style.cursor = "pointer";
       row.addEventListener("click", () => {
         this._open = entry.entry_id;
+        this._settings = false;
+        this._config = null;
+        this._render();
+      });
+      row.insertAdjacentHTML(
+        "beforeend",
+        '<ha-icon icon="mdi:chevron-right" style="--mdc-icon-size:22px;opacity:.5"></ha-icon>'
+      );
+      card.appendChild(row);
+    }
+    for (const device of this._zigbee || []) {
+      const entities = this._byEntry[device.entry_id] || [];
+      const row = document.createElement("div");
+      row.className = "dev";
+      row.innerHTML = `
+        <ha-icon icon="mdi:zigbee"></ha-icon>
+        <div class="grow">
+          <div>${device.title}</div>
+          <div class="muted">${this._t("entities", { n: entities.length })}</div>
+        </div>
+        <span class="pill">${this._t("zigbee_pill")}</span>`;
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => {
+        this._open = device.entry_id;
         this._settings = false;
         this._config = null;
         this._render();

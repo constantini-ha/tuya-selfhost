@@ -107,41 +107,67 @@ class Cloud:
 
         return False
 
-    async def async_login(self) -> bool:
-        """Login to the Tuya cloud."""
-        if not self.__user_code or not self.__qr_code:
-            _LOGGER.warning("Login attempted without successful QR scan")
-            return False, {}
+    def _store_auth(self, info: dict[str, Any]) -> None:
+        """Keep a login that worked, in memory and on disk."""
+        self.__authentication = {
+            "user_code": self.__user_code,
+            "terminal_id": info[CONF_TERMINAL_ID],
+            "endpoint": info[CONF_ENDPOINT],
+            "token_info": {
+                "t": info["t"],
+                "uid": info["uid"],
+                "expire_time": info["expire_time"],
+                "access_token": info["access_token"],
+                "refresh_token": info["refresh_token"],
+            },
+        }
+        self.__hass.data[DOMAIN]["auth_cache"] = self.__authentication
+        persist_auth(self.__hass)
 
-        success, info = await self.__hass.async_add_executor_job(
+    def _note_error(self, info: dict[str, Any]) -> None:
+        self.__error_code = info.get(TUYA_RESPONSE_CODE, {})
+        self.__error_msg = info.get(TUYA_RESPONSE_MSG, "Unknown error")
+
+    async def _async_login_result(self):
+        return await self.__hass.async_add_executor_job(
             self.__login_control.login_result,
             self.__qr_code,
             TUYA_CLIENT_ID,
             self.__user_code,
         )
+
+    async def async_login(self) -> bool:
+        """Login to the Tuya cloud."""
+        if not self.__user_code or not self.__qr_code:
+            _LOGGER.warning("Login attempted without successful QR scan")
+            return False
+
+        success, info = await self._async_login_result()
         if success:
-            self.__authentication = {
-                "user_code": self.__user_code,
-                "terminal_id": info[CONF_TERMINAL_ID],
-                "endpoint": info[CONF_ENDPOINT],
-                "token_info": {
-                    "t": info["t"],
-                    "uid": info["uid"],
-                    "expire_time": info["expire_time"],
-                    "access_token": info["access_token"],
-                    "refresh_token": info["refresh_token"],
-                },
-            }
-            self.__hass.data[DOMAIN]["auth_cache"] = self.__authentication
-            persist_auth(self.__hass)
+            self._store_auth(info)
         else:
             _LOGGER.warning("Login failed: %s", info)
-            self.__error_code = info.get(TUYA_RESPONSE_CODE, {})
-            self.__error_msg = info.get(TUYA_RESPONSE_MSG, "Unknown error")
+            self._note_error(info)
             # Ensure expired authentication is cleared on next attempt
             self.__hass.data[DOMAIN]["auth_cache"] = None
             self.__authentication = {}
             persist_auth(self.__hass)
+        return success
+
+    async def async_poll_login(self) -> bool:
+        """Has the code been scanned yet?
+
+        async_login throws the stored account away whenever it fails, which is
+        right for a form someone just submitted and wrong for a poll that runs
+        every few seconds while the code is still on screen.
+        """
+        if not self.__user_code or not self.__qr_code:
+            return False
+        success, info = await self._async_login_result()
+        if success:
+            self._store_auth(info)
+        else:
+            self._note_error(info)
         return success
 
     def _manager(self) -> Manager:

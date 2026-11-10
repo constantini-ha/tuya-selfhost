@@ -191,6 +191,27 @@ contradicts your instinct, trust the note.
   carries the state; the line underneath appears only for the exceptions worth
   reading: no answer, a gateway to leave online, a sub-device with no address of
   its own.
+- **Sign in where you ask people to sign in.** The Network tab used to send
+  them to `/config/integrations/dashboard/add`, a form that adds a device, to
+  get an account it needed for a check — and they rightly asked what the login
+  was even for. `cloud_api.py` serves `cloud/status`, `cloud/qr`, `cloud/login`
+  and `cloud/logout`, so the panel runs the whole QR dance in place.
+- **A poll must not call `async_login`.** It clears the stored account on every
+  failure, which is right for a form someone just submitted and ruinous four
+  seconds at a time while the code is still on screen. `async_poll_login` shares
+  the success path and leaves a stored login alone when the answer is "not
+  scanned yet".
+- **`ha-qr-code` does not exist inside a custom panel.** Home Assistant loads
+  its components per page, and `customElements.whenDefined("ha-qr-code")` in the
+  panel never resolves — a test waiting on it hangs until it is killed. `segno`
+  is already in the container, so the backend sends the matrix as rows of 0 and
+  1 and the panel draws one `<path>`. Always black on white: a scanner needs the
+  contrast whatever the theme is.
+- Check a rendered QR by sampling the screenshot, not by trusting the encoder:
+  take the bounding box of the pixels above 245 (the white card), divide by
+  `size + 4` for the quiet zone, and read the centre of each module. The longest
+  white *run* is not the square — the black modules cut it short, and the
+  misalignment reads as a random 50% error rate.
 
 ### Alexa
 
@@ -280,11 +301,29 @@ contradicts your instinct, trust the note.
 - Release notes are written in English, Portuguese and Spanish, in that order,
   separated by `---`.
 
+### Zigbee in this panel
+
+- Zigbee devices belong to Home Assistant's own ZHA integration, and the panel
+  only borrows them: `zha/devices` over the websocket returns everything,
+  including an `entities` list, so no device-registry lookup is needed. Skip the
+  one with `active_coordinator` — that is the stick.
+- They are folded into the panel under a synthetic `zha:<ieee>` entry id with
+  the same shape as a config entry, so the device page, the tiles, all-on and
+  all-off work unchanged. The dashboard card takes `entities` instead of
+  `entry_id`, which it already supported.
+- **Pairing is a service, not a websocket command.** `zha/devices/permit` is
+  gone; call `zha.permit` with a `duration`, and `zha.permit` with `duration: 0`
+  to close the window early. Joins arrive through an in-process dispatcher
+  signal, not the event bus, so the panel polls `zha/devices` and diffs instead
+  of subscribing to ZHA internals.
+
 ### Testing the frontend
 
 - Playwright drives the real Home Assistant. Browsers live in
   `~/.cache/ms-playwright`; pass `executablePath` so nothing is downloaded, and
-  set `LD_LIBRARY_PATH` to the folder holding the Chrome dependencies.
+  set `LD_LIBRARY_PATH=~/.local/lib/chrome-deps`. That folder exists because the
+  Umbrel's root filesystem is rebuilt at boot: the NSS libraries Chrome needs
+  disappear with it, and the copy under `~` is what survives.
 - `getByText` pierces shadow DOM; `document.body.innerText` does not, so walk
   `shadowRoot` when reading the panel's text.
 - Save a storage state once and reuse it — repeated logins hit a 429.

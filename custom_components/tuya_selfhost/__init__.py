@@ -39,6 +39,7 @@ from .helpers.discovery import async_start_discovery, async_stop_discovery
 from .ble.autodetect import async_detect_reserve
 from .remote_card import async_setup_remote_card
 from .cloud import async_restore_auth
+from .cloud_api import async_setup_cloud_api
 from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
@@ -1013,6 +1014,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await async_start_discovery(hass)
     await async_setup_remote_card(hass)
     await async_restore_auth(hass)
+    await async_setup_cloud_api(hass)
     config = {**entry.data, **entry.options, "name": entry.title}
     try:
         device = await hass.async_add_executor_job(setup_device, hass, config)
