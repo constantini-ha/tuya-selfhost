@@ -35,6 +35,9 @@ from .helpers.log import log_json
 
 _LOGGER = logging.getLogger(__name__)
 
+# None is a valid result (error 900), so exhaustion needs its own answer.
+_UNREACHABLE = object()
+
 # Extra context for tinytuya error codes whose message does not fully describe
 # the possible causes.  Error 914 in particular is reported for any failure to
 # negotiate a session, which includes a device that is refusing connections
@@ -690,6 +693,21 @@ class TuyaLocalDevice(object):
             self._lock.release()
 
     async def _retry_on_failed_connection(self, func, error_message):
+        """Try the device, and when it has a reserve, really try that too.
+
+        The swap used to land on the last attempt of a round, so the other
+        transport was selected and then thrown away unused. A device that was
+        already unreachable when Home Assistant set it up never got as far as
+        its Bluetooth reserve: setup failed, the device object went with it,
+        and the next retry started over on Wi-Fi.
+        """
+        for _ in range(2 if self._api_standby is not None else 1):
+            result = await self._attempt_over_transport(func, error_message)
+            if result is not _UNREACHABLE:
+                return result
+
+    async def _attempt_over_transport(self, func, error_message):
+        """One full round of attempts over the transport currently in use."""
         if self._api_protocol_version_index is None:
             await self._rotate_api_protocol_version()
         auto = (self._protocol_configured == "auto") and (
@@ -772,6 +790,8 @@ class TuyaLocalDevice(object):
 
                 if not self._api_protocol_working:
                     await self._rotate_api_protocol_version()
+
+        return _UNREACHABLE
 
     def _get_cached_state(self):
         cached_state = self._cached_state.copy()

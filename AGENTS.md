@@ -241,6 +241,15 @@ contradicts your instinct, trust the note.
   coming back to Wi-Fi meant walking 3.1 through 3.5 again. A device that
   blinked for one poll then spent minutes swapping back and forth while being
   perfectly reachable the whole time. Each transport now keeps its own state.
+- **A reserve is only real if it is tried.** `_switch_transport` ran on the last
+  attempt of a round, so the other transport was selected and the round then
+  ended: nothing ever ran on it. Worst at setup, where a failed refresh raises
+  `ConfigEntryNotReady` and the device object is discarded, so the next retry
+  started on Wi-Fi again — the log fell to Bluetooth over and over and never
+  came back. `_retry_on_failed_connection` now runs `_attempt_over_transport`
+  once per transport. It needs a sentinel, not `None`, to tell exhaustion from
+  success: error 900 (a remote with no status to report) legitimately returns
+  `None`.
 - When a device looks lost, prove it from outside Home Assistant before touching
   the code: listen for the UDP broadcast on 6666/6667 (AES-ECB with
   `md5(b"yGAdlopoPVldABfn")`) to see which device id is at which address, then
