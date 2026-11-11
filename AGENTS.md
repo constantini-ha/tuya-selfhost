@@ -121,6 +121,23 @@ contradicts your instinct, trust the note.
 - Destructive actions confirm in place: the row or a banner swaps to
   "yes / cancel" rather than opening a dialog. See `_confirmControl` and
   `_confirmButton`.
+- **A disabled entity has no state at all**, so `hass.states[id]` is undefined
+  and `_friendly()` falls back to the raw entity id. Both lists in the panel
+  were showing `switch.interruptor_bomba_overcharge_protection` as a device's
+  name. Registry entries with `disabled_by` or `hidden_by` are dropped in
+  `_boot`; the dashboard card had always filtered them.
+- **A `1fr` column cannot shrink below its content.** One unbreakable 46
+  character entity id took 262px of a 3-column grid, and `aspect-ratio:2/3`
+  turned that into a 393px tall tile — a huge empty box next to a normal one.
+  Grids that hold names use `minmax(0, 1fr)`, and `.tilename` wraps with
+  `overflow-wrap:anywhere`.
+- **Not every `switch.` is a key on the wall.** A relay has no
+  `entity_category`; overcharge protection, child lock and the like are
+  `config`, and they belong in the settings list, never in the tile grid.
+- The settings list shows one device at a time, so each row strips the device
+  title from the entity name (`_shortName`) instead of repeating it eleven
+  times. `_value()` adds the unit and says "Unavailable" in the user's own
+  language rather than printing Home Assistant's raw state.
 
 ### Remote layouts and the keys they become
 

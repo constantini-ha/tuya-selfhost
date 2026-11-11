@@ -2,7 +2,7 @@ import { t, tn } from "./i18n.js";
 
 const STYLE = `
   .pad { padding:16px }
-  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:4px 16px 0 }
+  .tiles { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:4px 16px 0 }
   .tilewrap { text-align:center }
   .tile { width:100%; aspect-ratio:2/3; border-radius:18px; cursor:pointer; padding:0 0 14px;
     display:flex; align-items:flex-end; justify-content:center; transition:all .18s;
@@ -15,7 +15,8 @@ const STYLE = `
   .tile:disabled { opacity:.4; cursor:default }
   .rocker { width:44%; height:6px; border-radius:999px; background:var(--secondary-text-color); opacity:.55 }
   .tile[aria-pressed="true"] .rocker { background:var(--text-primary-color); opacity:.9 }
-  .tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color) }
+  .tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color);
+    overflow-wrap:anywhere }
   .actions { display:flex; justify-content:space-around; gap:8px; padding:16px 8px 10px }
   .action { display:flex; flex-direction:column; align-items:center; gap:6px; border:none;
     background:transparent; cursor:pointer; font:inherit; font-size:.78em;
@@ -100,7 +101,9 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
               // A remote's power pair lives on its own card, not among the gangs.
               !e.entity_id.startsWith("switch.tuya_remote_") &&
               !e.disabled_by &&
-              !e.hidden_by
+              !e.hidden_by &&
+              // A key on the wall has no category; a setting like overcharge does.
+              !e.entity_category
           )
           .map((e) => e.entity_id);
       } catch (err) {

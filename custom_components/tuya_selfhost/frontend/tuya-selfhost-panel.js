@@ -88,7 +88,7 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .tools { display:flex; justify-content:center; gap:1px; margin-top:3px }
 .tools button { border:none; background:transparent; color:#7D879C; cursor:pointer;
   font:inherit; font-size:11px; padding:1px 3px }
-.tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:4px 0 }
+.tiles { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:4px 0 }
 .tilewrap { text-align:center }
 .tile { width:100%; aspect-ratio:2/3; border-radius:18px; cursor:pointer; padding:0 0 14px;
   display:flex; align-items:flex-end; justify-content:center;
@@ -101,7 +101,8 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .tile:disabled { opacity:.4; cursor:default }
 .rocker { width:44%; height:6px; border-radius:999px; background:var(--secondary-text-color); opacity:.55 }
 .tile[aria-pressed="true"] .rocker { background:var(--text-primary-color); opacity:.9 }
-.tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color) }
+.tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color);
+  overflow-wrap:anywhere }
 .actions { display:flex; justify-content:space-around; gap:8px; padding:16px 8px 4px;
   border-top:1px solid var(--divider-color); margin-top:16px }
 .action { display:flex; flex-direction:column; align-items:center; gap:6px; border:none;
@@ -197,6 +198,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._byEntry = {};
     for (const item of registry) {
       if (item.platform !== "tuya_selfhost" || !item.config_entry_id) continue;
+      // A disabled or hidden entity never gets a state, so it has nothing to show.
+      if (item.disabled_by || item.hidden_by) continue;
       (this._byEntry[item.config_entry_id] ||= []).push(item);
     }
     this._layouts = {};
@@ -1303,7 +1306,9 @@ class TuyaSelfhostPanel extends HTMLElement {
     const entities = this._byEntry[entry.entry_id] || [];
     const isGang = (e) =>
       e.entity_id.startsWith("switch.") &&
-      !e.entity_id.startsWith("switch.tuya_remote_");
+      !e.entity_id.startsWith("switch.tuya_remote_") &&
+      // A key on the wall has no category; a setting like overcharge does.
+      !e.entity_category;
     const gangs = entities.filter(isGang);
     const rest = entities.filter((e) => !isGang(e));
 
@@ -1316,7 +1321,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       title.textContent = this._t("settings");
       list.appendChild(title);
       for (const item of this._sorted(rest.length ? rest : entities)) {
-        list.appendChild(this._entityRow(item));
+        list.appendChild(this._entityRow(item, entry.title));
       }
       card.appendChild(list);
       return card;
@@ -1327,7 +1332,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (gangs.length && !remote) {
       const grid = document.createElement("div");
       grid.className = "pad tiles";
-      grid.style.gridTemplateColumns = "repeat(3, 1fr)";
+      grid.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
       for (const item of gangs) {
         const state = this._hass.states[item.entity_id];
         const on = state && state.state === "on";
@@ -1343,8 +1348,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         );
         const name = document.createElement("div");
         name.className = "tilename";
-        name.textContent = this._friendly(item.entity_id).replace(entry.title, "").trim() ||
-          this._friendly(item.entity_id);
+        name.textContent = this._shortName(item.entity_id, entry.title);
         wrap.append(tile, name);
         grid.appendChild(wrap);
       }
@@ -1473,7 +1477,22 @@ class TuyaSelfhostPanel extends HTMLElement {
     return (state && state.attributes && state.attributes.friendly_name) || entityId;
   }
 
-  _entityRow(item) {
+  _shortName(entityId, title) {
+    const name = this._friendly(entityId);
+    return (title && name.replace(title, "").trim()) || name;
+  }
+
+  _value(state) {
+    if (!state) return "—";
+    if (state.state === "unavailable") return this._t("unavailable");
+    if (state.state === "unknown") return this._t("unknown");
+    if (state.entity_id.startsWith("binary_sensor."))
+      return this._t(state.state === "on" ? "state_yes" : "state_no");
+    const unit = state.attributes.unit_of_measurement;
+    return unit ? state.state + " " + unit : state.state;
+  }
+
+  _entityRow(item, title) {
     const id = item.entity_id;
     const domain = id.split(".")[0];
     const state = this._hass.states[id];
@@ -1481,7 +1500,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     row.className = "ent";
     const label = document.createElement("div");
     label.className = "grow";
-    label.innerHTML = `<div class="name">${this._friendly(id)}</div><div class="eid">${id}</div>`;
+    label.innerHTML = `<div class="name">${this._shortName(id, title)}</div><div class="eid">${id}</div>`;
     row.appendChild(label);
 
     const TOGGLEABLE = ["switch", "light", "fan", "humidifier", "siren", "input_boolean"];
@@ -1502,6 +1521,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       const press = document.createElement("button");
       press.className = "act ghost";
       press.textContent = this._t("activate");
+      press.disabled = !state || state.state === "unavailable";
       press.addEventListener("click", () =>
         this._hass.callService(domain, domain === "button" ? "press" : "turn_on", {
           entity_id: id,
@@ -1535,7 +1555,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     } else {
       const pill = document.createElement("span");
       pill.className = "pill";
-      pill.textContent = state ? state.state : "—";
+      pill.textContent = this._value(state);
       row.appendChild(pill);
     }
     return row;
