@@ -167,6 +167,11 @@ contradicts your instinct, trust the note.
   waits 700ms and prefers the friendly one, because matching on `press_type`
   alone would fire for every gesture. When only the quirk speaks, the params go
   into the trigger too.
+- Confirmed on the hardware (`_TZ3000_yj6k7vfo` TS0041, quirk
+  `TuyaSmartRemote0041TOPlusA`): a tap is `press_type: 0`, a double tap is `1`
+  and a hold is `2`, each paired with its `remote_button_*` twin. A hold under
+  about three seconds comes through as a plain tap, so a button that seems to
+  have no hold was probably released too early — the quirk maps all three.
 - Automations are written with `hass.callApi("POST", "config/automation/config/"
   + id, config)` and removed with `DELETE` on the same path, in the current
   schema (`triggers`, `conditions`, `actions`, with `action:` inside an action).
