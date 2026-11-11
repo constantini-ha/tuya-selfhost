@@ -210,6 +210,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._layouts[remote] = (stored && stored.controls) || [];
     }
     await this._loadZigbee();
+    this._loadAutomations();
     await this._cloudStatus();
     this._render();
     this._watch();
@@ -237,6 +238,139 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._zigbee = [];
       this._noZigbee = true;
     }
+  }
+
+  async _loadAutomations() {
+    const ids = Object.keys(this._hass.states)
+      .filter((id) => id.startsWith("automation."))
+      .sort();
+    const key = ids.join("|");
+    if (key === this._autosKey) return;
+    this._autosKey = key;
+    const loaded = await Promise.all(
+      ids.map((id) =>
+        this._hass
+          .callWS({ type: "automation/config", entity_id: id })
+          .then((reply) => ({ entity_id: id, config: (reply && reply.config) || {} }))
+          .catch(() => null)
+      )
+    );
+    this._autos = loaded.filter(Boolean).map((auto) => {
+      const triggers = auto.config.triggers || auto.config.trigger || [];
+      return { ...auto, triggers, text: JSON.stringify(triggers).toLowerCase() };
+    });
+    this._render();
+  }
+
+  // What a device sets off, not what acts on it: only the triggers are searched.
+  _automationsFor(entry) {
+    const keys = [];
+    if (entry.zha) keys.push(entry.zha.ieee, entry.zha.device_reg_id);
+    for (const item of this._byEntry[entry.entry_id] || []) keys.push(item.entity_id);
+    return (this._autos || []).filter((auto) =>
+      keys.some((key) => key && auto.text.includes(String(key).toLowerCase()))
+    );
+  }
+
+  _pressOf(auto) {
+    const NAMED = {
+      remote_button_short_press: "press_short",
+      remote_button_double_press: "press_double",
+      remote_button_long_press: "press_long",
+    };
+    for (const trigger of auto.triggers || []) {
+      const command = (trigger.event_data || {}).command || trigger.subtype;
+      if (NAMED[command]) return this._t(NAMED[command]);
+    }
+    return null;
+  }
+
+  _ago(iso) {
+    const diff = (new Date(iso).getTime() - Date.now()) / 1000;
+    const format = new Intl.RelativeTimeFormat(this._hass.language || "en", {
+      numeric: "auto",
+    });
+    const units = [
+      ["year", 31536000],
+      ["month", 2592000],
+      ["day", 86400],
+      ["hour", 3600],
+      ["minute", 60],
+    ];
+    for (const [unit, seconds] of units)
+      if (Math.abs(diff) >= seconds) return format.format(Math.round(diff / seconds), unit);
+    return format.format(Math.round(diff), "second");
+  }
+
+  // A device with keys only earns this block when it really sets something
+  // off; one without keys gets it anyway, or its page would be empty.
+  _automationBlock(entry, always) {
+    const autos = this._automationsFor(entry);
+    if (!autos.length && !always) return null;
+    const box = document.createElement("div");
+    box.className = "pad";
+    box.style.borderTop = "1px solid var(--divider-color)";
+    const title = document.createElement("div");
+    title.className = "muted";
+    title.style.marginBottom = "4px";
+    title.textContent = this._t("does_what");
+    box.appendChild(title);
+
+    if (!autos.length) {
+      const text = document.createElement("div");
+      text.className = "muted";
+      text.style.margin = "6px 0 10px";
+      text.textContent = this._t("does_nothing");
+      const make = document.createElement("button");
+      make.className = "act ghost";
+      make.textContent = this._t("make_automation");
+      make.addEventListener("click", () => this._navigate("/config/automation/edit/new"));
+      box.append(text, make);
+      return box;
+    }
+
+    for (const auto of autos) {
+      const state = this._hass.states[auto.entity_id];
+      const on = state && state.state === "on";
+      const when = state && state.attributes.last_triggered;
+      const label = document.createElement("div");
+      label.className = "grow";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = auto.config.alias || auto.entity_id;
+      const facts = document.createElement("div");
+      facts.className = "eid";
+      facts.textContent = [
+        this._pressOf(auto),
+        when ? this._t("last_run", { when: this._ago(when) }) : this._t("never_run"),
+      ]
+        .filter(Boolean)
+        .join(" \u00b7 ");
+      label.append(name, facts);
+
+      const run = document.createElement("button");
+      run.className = "act ghost";
+      run.textContent = this._t("activate");
+      run.disabled = !on;
+      run.addEventListener("click", () =>
+        this._hass.callService("automation", "trigger", { entity_id: auto.entity_id })
+      );
+      const toggle = document.createElement("button");
+      toggle.className = "toggle";
+      toggle.setAttribute("role", "switch");
+      toggle.setAttribute("aria-checked", on ? "true" : "false");
+      toggle.title = this._t(on ? "auto_disable" : "auto_enable");
+      toggle.innerHTML = '<span class="knob"></span>';
+      toggle.addEventListener("click", () =>
+        this._hass.callService("automation", "toggle", { entity_id: auto.entity_id })
+      );
+
+      const row = document.createElement("div");
+      row.className = "ent";
+      row.append(label, run, toggle);
+      box.appendChild(row);
+    }
+    return box;
   }
 
   async _cloudStatus() {
@@ -1273,6 +1407,7 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   _renderDevice() {
+    this._loadAutomations();
     const entry = this._entry();
     const remote = this._remoteOf(entry);
     const card = document.createElement("ha-card");
@@ -1302,6 +1437,14 @@ class TuyaSelfhostPanel extends HTMLElement {
       head.appendChild(cog);
     }
     card.appendChild(head);
+
+    if (entry.zha) {
+      const facts = document.createElement("div");
+      facts.className = "pad muted";
+      facts.style.paddingTop = "0";
+      facts.textContent = this._zigbeeFacts(entry);
+      card.appendChild(facts);
+    }
 
     const entities = this._byEntry[entry.entry_id] || [];
     const isGang = (e) =>
@@ -1457,6 +1600,9 @@ class TuyaSelfhostPanel extends HTMLElement {
       section.appendChild(form);
       card.appendChild(section);
     }
+
+    const automations = this._automationBlock(entry, !gangs.length);
+    if (automations) card.appendChild(automations);
     return card;
   }
 

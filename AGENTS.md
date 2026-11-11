@@ -138,6 +138,25 @@ contradicts your instinct, trust the note.
   title from the entity name (`_shortName`) instead of repeating it eleven
   times. `_value()` adds the unit and says "Unavailable" in the user's own
   language rather than printing Home Assistant's raw state.
+- **A button is an input, so its page has nothing to press.** The device page
+  shows what a device sets off: `_loadAutomations()` reads every automation's
+  config once through the `automation/config` websocket command, and
+  `_automationsFor()` keeps the ones whose **triggers** mention this device's
+  ieee, its registry id or one of its entities. Searching the whole config
+  would also catch automations that merely act on the device, which is the
+  opposite question. A device with keys only gets the block when something
+  matches; one without keys always gets it, or the page is blank.
+- `search/related` does not find those automations. A ZHA button is wired with
+  an `event` trigger on `zha_event` carrying `device_ieee`, which is not a
+  device reference Home Assistant indexes.
+- `last_triggered` carries a timezone and is safe to hand to
+  `Intl.RelativeTimeFormat`. ZHA's `last_seen` does not: it is naive local time
+  from the container, so a browser in another zone reads it hours off. That is
+  why the facts line shows model, signal and battery and not when it last
+  spoke.
+- A battery device usually reports `lqi: null` — ZHA only knows the signal of a
+  packet it has received since it started, and a sleeping button has not sent
+  one. Showing nothing is right; do not read it as zero.
 
 ### Remote layouts and the keys they become
 
