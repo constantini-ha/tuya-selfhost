@@ -115,6 +115,10 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .ent + .ent { border-top:1px solid var(--divider-color) }
 .ent .name { font-size:.95em }
 .ent .eid { font-size:.72em; color:var(--secondary-text-color) }
+.autorow { padding:10px 0 }
+.autorow + .autorow { border-top:1px solid var(--divider-color) }
+.autorow .acts { display:flex; align-items:center; justify-content:flex-end; gap:8px;
+  margin-top:6px }
 .toggle { width:46px; height:26px; border-radius:999px; border:none; cursor:pointer; padding:0;
   background:var(--divider-color); position:relative; transition:background .18s; flex:none }
 .toggle .knob { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%;
@@ -262,6 +266,25 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
+  _gangsOf(entry) {
+    return (this._byEntry[entry.entry_id] || []).filter(
+      (e) =>
+        e.entity_id.startsWith("switch.") &&
+        !e.entity_id.startsWith("switch.tuya_remote_") &&
+        // A key on the wall has no category; a setting like overcharge does.
+        !e.entity_category
+    );
+  }
+
+  _pressLabel(command) {
+    const NAMED = {
+      remote_button_short_press: "press_short",
+      remote_button_double_press: "press_double",
+      remote_button_long_press: "press_long",
+    };
+    return NAMED[command] ? this._t(NAMED[command]) : null;
+  }
+
   // What a device sets off, not what acts on it: only the triggers are searched.
   _automationsFor(entry) {
     const keys = [];
@@ -273,16 +296,243 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   _pressOf(auto) {
-    const NAMED = {
-      remote_button_short_press: "press_short",
-      remote_button_double_press: "press_double",
-      remote_button_long_press: "press_long",
-    };
     for (const trigger of auto.triggers || []) {
-      const command = (trigger.event_data || {}).command || trigger.subtype;
-      if (NAMED[command]) return this._t(NAMED[command]);
+      const label = this._pressLabel((trigger.event_data || {}).command || trigger.subtype);
+      if (label) return label;
     }
     return null;
+  }
+
+  // ---------- shortcuts made from a press ----------
+
+  _startShortcut(entry) {
+    this._newAuto = { entry_id: entry.entry_id, command: null, params: null, error: null,
+                      target: null, keys: [], act: "toggle" };
+    this._render();
+    this._listenPress(entry);
+  }
+
+  // One press can speak twice: the quirk's own command and the friendly
+  // remote_button_* one. Collect for a moment and keep the friendly one.
+  async _listenPress(entry) {
+    this._stopPress();
+    const draft = this._newAuto;
+    draft.error = null;
+    draft.heard = [];
+    try {
+      this._unpress = await this._hass.connection.subscribeEvents((event) => {
+        const data = (event && event.data) || {};
+        if (!this._newAuto || this._newAuto.command) return;
+        if (data.device_ieee !== entry.zha.ieee) return;
+        this._newAuto.heard.push(data);
+        clearTimeout(this._pressPick);
+        this._pressPick = setTimeout(() => this._pickPress(), 700);
+      }, "zha_event");
+    } catch (err) {
+      draft.error = err.message || String(err);
+      this._render();
+      return;
+    }
+    this._pressTimer = setTimeout(() => {
+      this._stopPress();
+      if (this._newAuto && !this._newAuto.command) {
+        this._newAuto.error = this._t("press_none");
+        this._render();
+      }
+    }, 30000);
+  }
+
+  _pickPress() {
+    const draft = this._newAuto;
+    if (!draft || draft.command || !draft.heard.length) return;
+    const heard = draft.heard;
+    const best =
+      heard.find((data) => String(data.command || "").startsWith("remote_button_")) || heard[0];
+    draft.command = best.command;
+    draft.params = best.params && Object.keys(best.params).length ? best.params : null;
+    this._stopPress();
+    this._render();
+  }
+
+  _stopPress() {
+    clearTimeout(this._pressTimer);
+    clearTimeout(this._pressPick);
+    if (this._unpress) {
+      this._unpress();
+      this._unpress = null;
+    }
+  }
+
+  _cancelShortcut() {
+    this._stopPress();
+    this._newAuto = null;
+    this._render();
+  }
+
+  _shortcutTargets() {
+    const all = [...(this._entries || []), ...(this._zigbee || [])];
+    return all
+      .map((entry) => ({ id: entry.entry_id, title: entry.title, gangs: this._gangsOf(entry) }))
+      .filter((target) => target.gangs.length);
+  }
+
+  async _makeShortcut(entry) {
+    const draft = this._newAuto;
+    if (!draft || !draft.keys.length) return;
+    const press = this._pressLabel(draft.command) || draft.command;
+    const data = { device_ieee: entry.zha.ieee, command: draft.command };
+    // A quirk that only speaks press_type says which press in the params, and
+    // without them the shortcut would answer every press alike.
+    if (draft.params && !String(draft.command).startsWith("remote_button_"))
+      data.params = draft.params;
+    const config = {
+      alias: entry.title + " \u00b7 " + press,
+      description: this._t("auto_made_here"),
+      triggers: [{ trigger: "event", event_type: "zha_event", event_data: data }],
+      conditions: [],
+      actions: [{ action: "homeassistant." + draft.act, target: { entity_id: draft.keys } }],
+      mode: "single",
+    };
+    try {
+      await this._hass.callApi("POST", "config/automation/config/" + Date.now(), config);
+      this._newAuto = null;
+      this._flash = this._t("shortcut_saved");
+      this._refreshAutomations();
+    } catch (err) {
+      draft.error = this._t("shortcut_failed", { err: err.message || String(err) });
+      this._render();
+    }
+  }
+
+  async _removeAuto(auto) {
+    this._confirmAuto = null;
+    if (!auto.config.id) return;
+    try {
+      await this._hass.callApi("DELETE", "config/automation/config/" + auto.config.id);
+      this._refreshAutomations();
+    } catch (err) {
+      this._flash = this._t("shortcut_failed", { err: err.message || String(err) });
+      this._render();
+    }
+  }
+
+  // Home Assistant takes a moment to turn a saved config into an entity.
+  _refreshAutomations() {
+    this._render();
+    for (const wait of [200, 1500, 4000])
+      setTimeout(() => {
+        this._autosKey = null;
+        this._loadAutomations();
+      }, wait);
+  }
+
+  _shortcutForm(entry) {
+    const draft = this._newAuto;
+    const box = document.createElement("div");
+    box.style.marginTop = "12px";
+
+    const cancel = document.createElement("button");
+    cancel.className = "act ghost";
+    cancel.textContent = this._t("no");
+    cancel.addEventListener("click", () => this._cancelShortcut());
+
+    if (!draft.command) {
+      const text = document.createElement("div");
+      text.className = "muted";
+      text.style.marginBottom = "10px";
+      text.textContent = draft.error || this._t("press_now");
+      box.append(text);
+      if (draft.error) {
+        const again = document.createElement("button");
+        again.className = "act";
+        again.style.marginRight = "8px";
+        again.textContent = this._t("press_again");
+        again.addEventListener("click", () => this._listenPress(entry));
+        box.appendChild(again);
+      }
+      box.appendChild(cancel);
+      return box;
+    }
+
+    const got = document.createElement("div");
+    got.className = "muted";
+    got.textContent = this._t("press_got", {
+      press: this._pressLabel(draft.command) || draft.command,
+    });
+    box.appendChild(got);
+
+    const targets = this._shortcutTargets();
+    if (!draft.target && targets.length) draft.target = targets[0].id;
+    const picked = targets.find((target) => target.id === draft.target);
+
+    const pickers = document.createElement("div");
+    pickers.className = "row";
+    pickers.style.marginTop = "10px";
+    const where = document.createElement("select");
+    where.className = "grow";
+    for (const target of targets) {
+      const option = document.createElement("option");
+      option.value = target.id;
+      option.textContent = target.title;
+      option.selected = target.id === draft.target;
+      where.appendChild(option);
+    }
+    where.addEventListener("change", () => {
+      draft.target = where.value;
+      draft.keys = [];
+      this._render();
+    });
+    const what = document.createElement("select");
+    for (const [value, key] of [["toggle", "act_toggle"], ["turn_on", "act_on"], ["turn_off", "act_off"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = this._t(key);
+      option.selected = value === draft.act;
+      what.appendChild(option);
+    }
+    what.addEventListener("change", () => {
+      draft.act = what.value;
+    });
+    pickers.append(where, what);
+    box.appendChild(pickers);
+
+    const keys = document.createElement("div");
+    keys.className = "row";
+    keys.style.cssText = "flex-wrap:wrap;margin-top:10px";
+    for (const gang of picked ? picked.gangs : []) {
+      const chosen = draft.keys.includes(gang.entity_id);
+      const chip = document.createElement("button");
+      chip.className = chosen ? "act" : "act ghost";
+      chip.textContent = this._shortName(gang.entity_id, picked.title);
+      chip.addEventListener("click", () => {
+        draft.keys = chosen
+          ? draft.keys.filter((id) => id !== gang.entity_id)
+          : [...draft.keys, gang.entity_id];
+        this._render();
+      });
+      keys.appendChild(chip);
+    }
+    box.appendChild(keys);
+
+    if (draft.error) {
+      const failed = document.createElement("div");
+      failed.className = "muted";
+      failed.style.marginTop = "10px";
+      failed.textContent = draft.error;
+      box.appendChild(failed);
+    }
+
+    const foot = document.createElement("div");
+    foot.className = "row";
+    foot.style.marginTop = "12px";
+    const make = document.createElement("button");
+    make.className = "act";
+    make.textContent = this._t("create_shortcut");
+    make.disabled = !draft.keys.length;
+    make.addEventListener("click", () => this._makeShortcut(entry));
+    foot.append(make, cancel);
+    box.appendChild(foot);
+    return box;
   }
 
   _ago(iso) {
@@ -321,32 +571,53 @@ class TuyaSelfhostPanel extends HTMLElement {
       text.className = "muted";
       text.style.margin = "6px 0 10px";
       text.textContent = this._t("does_nothing");
-      const make = document.createElement("button");
-      make.className = "act ghost";
-      make.textContent = this._t("make_automation");
-      make.addEventListener("click", () => this._navigate("/config/automation/edit/new"));
-      box.append(text, make);
-      return box;
+      box.appendChild(text);
     }
 
     for (const auto of autos) {
       const state = this._hass.states[auto.entity_id];
       const on = state && state.state === "on";
       const when = state && state.attributes.last_triggered;
+      const row = document.createElement("div");
+      row.className = "autorow";
       const label = document.createElement("div");
-      label.className = "grow";
       const name = document.createElement("div");
       name.className = "name";
-      name.textContent = auto.config.alias || auto.entity_id;
       const facts = document.createElement("div");
       facts.className = "eid";
+      label.append(name, facts);
+      const acts = document.createElement("div");
+      acts.className = "acts";
+      row.append(label, acts);
+
+      if (this._confirmAuto === auto.entity_id) {
+        name.className = "muted";
+        name.textContent = this._t("confirm_delete_auto", {
+          name: auto.config.alias || auto.entity_id,
+        });
+        const yes = document.createElement("button");
+        yes.className = "act warn";
+        yes.textContent = this._t("yes");
+        yes.addEventListener("click", () => this._removeAuto(auto));
+        const no = document.createElement("button");
+        no.className = "act ghost";
+        no.textContent = this._t("no");
+        no.addEventListener("click", () => {
+          this._confirmAuto = null;
+          this._render();
+        });
+        acts.append(yes, no);
+        box.appendChild(row);
+        continue;
+      }
+
+      name.textContent = auto.config.alias || auto.entity_id;
       facts.textContent = [
         this._pressOf(auto),
         when ? this._t("last_run", { when: this._ago(when) }) : this._t("never_run"),
       ]
         .filter(Boolean)
         .join(" \u00b7 ");
-      label.append(name, facts);
 
       const run = document.createElement("button");
       run.className = "act ghost";
@@ -364,11 +635,37 @@ class TuyaSelfhostPanel extends HTMLElement {
       toggle.addEventListener("click", () =>
         this._hass.callService("automation", "toggle", { entity_id: auto.entity_id })
       );
-
-      const row = document.createElement("div");
-      row.className = "ent";
-      row.append(label, run, toggle);
+      acts.append(run, toggle);
+      if (auto.config.id) {
+        const del = document.createElement("button");
+        del.className = "act ghost";
+        del.textContent = this._t("delete");
+        del.addEventListener("click", () => {
+          this._confirmAuto = auto.entity_id;
+          this._render();
+        });
+        acts.appendChild(del);
+      }
       box.appendChild(row);
+    }
+
+    // Only a Zigbee device announces its presses, so only it can be learnt.
+    const drafting = this._newAuto && this._newAuto.entry_id === entry.entry_id;
+    if (entry.zha && drafting) {
+      box.appendChild(this._shortcutForm(entry));
+    } else if (entry.zha) {
+      const make = document.createElement("button");
+      make.className = "act";
+      make.style.marginTop = "10px";
+      make.textContent = this._t("new_shortcut");
+      make.addEventListener("click", () => this._startShortcut(entry));
+      box.appendChild(make);
+    } else if (!autos.length) {
+      const open = document.createElement("button");
+      open.className = "act ghost";
+      open.textContent = this._t("make_automation");
+      open.addEventListener("click", () => this._navigate("/config/automation/edit/new"));
+      box.appendChild(open);
     }
     return box;
   }
@@ -413,6 +710,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     clearTimeout(this._loginTimer);
     clearTimeout(this._pairTimer);
+    this._stopPress();
   }
 
   // ---------- data helpers ----------
@@ -1447,13 +1745,9 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
 
     const entities = this._byEntry[entry.entry_id] || [];
-    const isGang = (e) =>
-      e.entity_id.startsWith("switch.") &&
-      !e.entity_id.startsWith("switch.tuya_remote_") &&
-      // A key on the wall has no category; a setting like overcharge does.
-      !e.entity_category;
-    const gangs = entities.filter(isGang);
-    const rest = entities.filter((e) => !isGang(e));
+    const gangs = this._gangsOf(entry);
+    const taken = new Set(gangs.map((e) => e.entity_id));
+    const rest = entities.filter((e) => !taken.has(e.entity_id));
 
     if (this._settings) {
       const list = document.createElement("div");

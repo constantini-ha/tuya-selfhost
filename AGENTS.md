@@ -157,6 +157,23 @@ contradicts your instinct, trust the note.
 - A battery device usually reports `lqi: null` — ZHA only knows the signal of a
   packet it has received since it started, and a sleeping button has not sent
   one. Showing nothing is right; do not read it as zero.
+- **A shortcut is learnt, not chosen from a list.** The gesture names differ by
+  quirk and by manufacturer id — a TS0041 answers `remote_button_short_press`
+  while a SNZB-01P answers `toggle` — so the panel subscribes to `zha_event`,
+  asks for the press, and keeps what the device actually said. A hard-coded
+  dropdown of single/double/hold would be wrong on half the buttons.
+- One press can raise **two** events: the quirk's own (`press_type` with
+  `params: {press_type: 0}`) and the friendly `remote_button_*`. `_pickPress()`
+  waits 700ms and prefers the friendly one, because matching on `press_type`
+  alone would fire for every gesture. When only the quirk speaks, the params go
+  into the trigger too.
+- Automations are written with `hass.callApi("POST", "config/automation/config/"
+  + id, config)` and removed with `DELETE` on the same path, in the current
+  schema (`triggers`, `conditions`, `actions`, with `action:` inside an action).
+  An automation without an `id` came from YAML by hand and cannot be deleted
+  that way, so the panel hides its delete button.
+- Saving does not make the entity exist at once. `_refreshAutomations()` re-reads
+  at 200ms, 1.5s and 4s rather than assuming one reload is enough.
 
 ### Remote layouts and the keys they become
 
