@@ -1,4 +1,6 @@
 import { t } from "./i18n.js";
+import { OUTLET_CSS, OUTLET_KINDS, loadOutletKinds, outletFace, outletKind, saveOutletKinds }
+  from "./outlets.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
@@ -103,6 +105,9 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .tile[aria-pressed="true"] .rocker { background:var(--text-primary-color); opacity:.9 }
 .tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color);
   overflow-wrap:anywhere }
+${OUTLET_CSS}
+.kindrow { padding:10px 0 }
+.kindrow + .kindrow { border-top:1px solid var(--divider-color) }
 .actions { display:flex; justify-content:space-around; gap:8px; padding:16px 8px 4px;
   border-top:1px solid var(--divider-color); margin-top:16px }
 .action { display:flex; flex-direction:column; align-items:center; gap:6px; border:none;
@@ -213,6 +218,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       const stored = await this._hass.callWS({ type: LAYOUT_GET, key: remote });
       this._layouts[remote] = (stored && stored.controls) || [];
     }
+    this._kinds = await loadOutletKinds(this._hass);
     await this._loadZigbee();
     this._loadAutomations();
     await this._cloudStatus();
@@ -301,6 +307,57 @@ class TuyaSelfhostPanel extends HTMLElement {
       if (label) return label;
     }
     return null;
+  }
+
+  _kindsBlock(entry, gangs) {
+    if (!gangs.length) return null;
+    const box = document.createElement("div");
+    box.className = "pad";
+    box.style.borderTop = "1px solid var(--divider-color)";
+    const head = document.createElement("div");
+    head.textContent = this._t("outlet_kinds");
+    const hint = document.createElement("div");
+    hint.className = "muted";
+    hint.style.margin = "4px 0 6px";
+    hint.textContent = this._t("outlet_kinds_hint");
+    box.append(head, hint);
+
+    for (const item of gangs) {
+      const row = document.createElement("div");
+      row.className = "kindrow";
+      const name = document.createElement("div");
+      name.textContent = this._shortName(item.entity_id, entry.title);
+      const picker = document.createElement("div");
+      picker.className = "icons";
+      const state = this._hass.states[item.entity_id];
+      const current = outletKind(this._kinds, item.entity_id,
+        state && state.attributes.device_class);
+      for (const kind of OUTLET_KINDS) {
+        const pick = document.createElement("button");
+        pick.className = "iconpick";
+        pick.setAttribute("aria-pressed", String(current === kind.id));
+        pick.title = this._t(kind.label);
+        pick.innerHTML = kind.icon
+          ? `<ha-icon icon="${kind.icon}"></ha-icon>`
+          : '<span class="rocker" style="width:22px"></span>';
+        pick.addEventListener("click", () => this._setKind(item.entity_id, kind.id));
+        picker.appendChild(pick);
+      }
+      row.append(name, picker);
+      box.appendChild(row);
+    }
+    return box;
+  }
+
+  async _setKind(entityId, kind) {
+    this._kinds = { ...(this._kinds || {}), [entityId]: kind };
+    this._render();
+    this._saving = true;
+    try {
+      await saveOutletKinds(this._hass, this._kinds);
+    } finally {
+      this._saving = false;
+    }
   }
 
   // ---------- shortcuts made from a press ----------
@@ -700,6 +757,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       const stored = await this._hass.callWS({ type: LAYOUT_GET, key: remote });
       this._layouts[remote] = (stored && stored.controls) || [];
     }
+    this._kinds = await loadOutletKinds(this._hass);
     this._render();
   }
 
@@ -1761,6 +1819,8 @@ class TuyaSelfhostPanel extends HTMLElement {
         list.appendChild(this._entityRow(item, entry.title));
       }
       card.appendChild(list);
+      const kinds = this._kindsBlock(entry, gangs);
+      if (kinds) card.appendChild(kinds);
       return card;
     }
 
@@ -1779,7 +1839,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         tile.className = "tile";
         tile.setAttribute("aria-pressed", on ? "true" : "false");
         tile.disabled = !state || state.state === "unavailable";
-        tile.innerHTML = '<span class="rocker"></span>';
+        tile.innerHTML = outletFace(this._kinds, item.entity_id, state && state.attributes.device_class);
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: item.entity_id })
         );

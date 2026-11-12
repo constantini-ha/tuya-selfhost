@@ -1,4 +1,5 @@
 import { t, tn } from "./i18n.js";
+import { OUTLET_CSS, loadOutletKinds, outletFace, outletIcon } from "./outlets.js";
 
 const STYLE = `
   .pad { padding:16px }
@@ -52,6 +53,7 @@ const STYLE = `
   .gang .lbl { font-size:.7em; line-height:1.15; max-width:100%; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; color:var(--primary-text-color) }
   .gang .st { font-size:.64em; color:var(--secondary-text-color) }
+  ${OUTLET_CSS}
   .gang.off .lbl, .gang.off .st { opacity:.55 }
 `;
 
@@ -111,7 +113,32 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         this._gangs = [];
       }
     }
+    this._kinds = await loadOutletKinds(this._hass);
     this._render();
+    this._watch();
+  }
+
+  // Set a key's kind in the panel and this card is already showing it.
+  async _watch() {
+    if (this._unwatch) return;
+    try {
+      this._unwatch = await this._hass.connection.subscribeMessage(
+        async () => {
+          this._kinds = await loadOutletKinds(this._hass);
+          this._render();
+        },
+        { type: "tuya_selfhost/layout/subscribe" }
+      );
+    } catch (err) {
+      this._unwatch = null;
+    }
+  }
+
+  disconnectedCallback() {
+    if (this._unwatch) {
+      this._unwatch();
+      this._unwatch = null;
+    }
   }
 
   _name(entityId) {
@@ -206,7 +233,9 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
           b.className = on ? "gang" : "gang off";
           b.title = this._name(id);
           b.innerHTML = `
-            <span class="dot"><ha-icon icon="mdi:power"></ha-icon></span>
+            <span class="dot"><ha-icon icon="${
+              outletIcon(this._kinds, id, st && st.attributes.device_class) || "mdi:power"
+            }"></ha-icon></span>
             <span class="lbl">${this._name(id)}</span>
             <span class="st">${on ? "Ligado" : st && st.state === "unavailable" ? "—" : "Desligado"}</span>`;
           const dot = b.querySelector(".dot");
@@ -250,7 +279,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         tile.className = "tile";
         tile.setAttribute("aria-pressed", on ? "true" : "false");
         tile.disabled = !state || state.state === "unavailable";
-        tile.innerHTML = '<span class="rocker"></span>';
+        tile.innerHTML = outletFace(this._kinds, id, state && state.attributes.device_class);
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: id })
         );

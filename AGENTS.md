@@ -180,6 +180,18 @@ contradicts your instinct, trust the note.
 - Saving does not make the entity exist at once. `_refreshAutomations()` re-reads
   at 200ms, 1.5s and 4s rather than assuming one reload is enough.
 
+- **A socket says it is a socket.** A power strip gives four plain booleans and
+  nothing about USB, but the device config marks each outlet `class: outlet`, so
+  the switch carries `device_class: outlet` while a key on the wall carries
+  none. `outletKind()` in `outlets.js` reads that as the default, and only the
+  USB ports need saying by hand.
+- The kinds live in the layout store under the key `outlets` as
+  `{kinds: {entity_id: kind}}`. It is the same store and the same
+  `layout/get` · `layout/set` · `layout/subscribe` the remotes use, so the panel
+  and the dashboard card follow each other with no new backend.
+- Only the cloud knows a USB port is type C: locally the strip never says. That
+  is why the panel asks the house once instead of asking Tuya for an account.
+
 ### Remote layouts and the keys they become
 
 - The panel stores remotes in a `Store` named `tuya_selfhost_remote_layouts`,
