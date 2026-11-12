@@ -1,6 +1,6 @@
 import { t } from "./i18n.js";
-import { OUTLET_CSS, OUTLET_KINDS, loadOutletKinds, outletFace, outletKind, saveOutletKinds }
-  from "./outlets.js";
+import { OUTLET_CSS, OUTLET_KINDS, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
+  outletNames, saveOutletKinds } from "./outlets.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
@@ -108,6 +108,7 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 ${OUTLET_CSS}
 .kindrow { padding:10px 0 }
 .kindrow + .kindrow { border-top:1px solid var(--divider-color) }
+.iconpick .face { width:22px; height:22px; --mdc-icon-size:22px }
 .actions { display:flex; justify-content:space-around; gap:8px; padding:16px 8px 4px;
   border-top:1px solid var(--divider-color); margin-top:16px }
 .action { display:flex; flex-direction:column; align-items:center; gap:6px; border:none;
@@ -309,6 +310,20 @@ class TuyaSelfhostPanel extends HTMLElement {
     return null;
   }
 
+  _keyNames(entry, gangs) {
+    return outletNames(
+      gangs.map((item) => ({
+        entity_id: item.entity_id,
+        named: !!item.name,
+        fallback: this._shortName(item.entity_id, entry.title),
+        deviceClass: (this._hass.states[item.entity_id] || { attributes: {} })
+          .attributes.device_class,
+      })),
+      this._kinds,
+      (key) => this._t(key)
+    );
+  }
+
   _kindsBlock(entry, gangs) {
     if (!gangs.length) return null;
     const box = document.createElement("div");
@@ -322,11 +337,12 @@ class TuyaSelfhostPanel extends HTMLElement {
     hint.textContent = this._t("outlet_kinds_hint");
     box.append(head, hint);
 
+    const names = this._keyNames(entry, gangs);
     for (const item of gangs) {
       const row = document.createElement("div");
       row.className = "kindrow";
       const name = document.createElement("div");
-      name.textContent = this._shortName(item.entity_id, entry.title);
+      name.textContent = names[item.entity_id];
       const picker = document.createElement("div");
       picker.className = "icons";
       const state = this._hass.states[item.entity_id];
@@ -337,9 +353,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         pick.className = "iconpick";
         pick.setAttribute("aria-pressed", String(current === kind.id));
         pick.title = this._t(kind.label);
-        pick.innerHTML = kind.icon
-          ? `<ha-icon icon="${kind.icon}"></ha-icon>`
-          : '<span class="rocker" style="width:22px"></span>';
+        pick.innerHTML = kindGlyph(kind, '<span class="rocker" style="width:22px"></span>');
         pick.addEventListener("click", () => this._setKind(item.entity_id, kind.id));
         picker.appendChild(pick);
       }
@@ -1830,6 +1844,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       const grid = document.createElement("div");
       grid.className = "pad tiles";
       grid.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
+      const names = this._keyNames(entry, gangs);
       for (const item of gangs) {
         const state = this._hass.states[item.entity_id];
         const on = state && state.state === "on";
@@ -1839,13 +1854,14 @@ class TuyaSelfhostPanel extends HTMLElement {
         tile.className = "tile";
         tile.setAttribute("aria-pressed", on ? "true" : "false");
         tile.disabled = !state || state.state === "unavailable";
-        tile.innerHTML = outletFace(this._kinds, item.entity_id, state && state.attributes.device_class);
+        tile.innerHTML = outletGlyph(this._kinds, item.entity_id,
+          state && state.attributes.device_class);
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: item.entity_id })
         );
         const name = document.createElement("div");
         name.className = "tilename";
-        name.textContent = this._shortName(item.entity_id, entry.title);
+        name.textContent = names[item.entity_id];
         wrap.append(tile, name);
         grid.appendChild(wrap);
       }

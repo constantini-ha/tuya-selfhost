@@ -1,5 +1,5 @@
 import { t, tn } from "./i18n.js";
-import { OUTLET_CSS, loadOutletKinds, outletFace, outletIcon } from "./outlets.js";
+import { OUTLET_CSS, loadOutletKinds, outletGlyph, outletNames } from "./outlets.js";
 
 const STYLE = `
   .pad { padding:16px }
@@ -49,7 +49,7 @@ const STYLE = `
     border:none; background:transparent; cursor:pointer; font:inherit; padding:2px }
   .gang .dot { width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
     justify-content:center; transition:all .18s }
-  .gang .dot ha-icon { --mdc-icon-size:19px }
+  .gang .dot .face { width:19px; height:19px; --mdc-icon-size:19px }
   .gang .lbl { font-size:.7em; line-height:1.15; max-width:100%; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; color:var(--primary-text-color) }
   .gang .st { font-size:.64em; color:var(--secondary-text-color) }
@@ -108,6 +108,11 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
               !e.entity_category
           )
           .map((e) => e.entity_id);
+        this._named = Object.fromEntries(
+          registry
+            .filter((e) => e.config_entry_id === this._config.entry_id)
+            .map((e) => [e.entity_id, !!e.name])
+        );
       } catch (err) {
         this._error = err.message || String(err);
         this._gangs = [];
@@ -146,6 +151,21 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
     const full = (state && state.attributes.friendly_name) || entityId;
     const title = this._config.title;
     return (title ? full.replace(title, "").trim() : full) || full;
+  }
+
+  _names() {
+    // An entity list in the card's own config was named there, so it is kept.
+    return outletNames(
+      (this._gangs || []).map((id) => ({
+        entity_id: id,
+        named: !this._named || this._named[id] !== false,
+        fallback: this._name(id),
+        deviceClass: (this._hass.states[id] || { attributes: {} }).attributes
+          .device_class,
+      })),
+      this._kinds,
+      (key) => t(this.hass, key)
+    );
   }
 
   _area() {
@@ -222,6 +242,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
       });
       card.appendChild(head);
 
+      const names = this._names();
       if (this._gangs.length > 1) {
         const row = document.createElement("div");
         row.className = "gangs";
@@ -231,12 +252,13 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
           const cor = CORES[index % CORES.length];
           const b = document.createElement("button");
           b.className = on ? "gang" : "gang off";
-          b.title = this._name(id);
+          b.title = names[id];
           b.innerHTML = `
-            <span class="dot"><ha-icon icon="${
-              outletIcon(this._kinds, id, st && st.attributes.device_class) || "mdi:power"
-            }"></ha-icon></span>
-            <span class="lbl">${this._name(id)}</span>
+            <span class="dot">${outletGlyph(
+              this._kinds, id, st && st.attributes.device_class,
+              '<ha-icon class="face" icon="mdi:power"></ha-icon>'
+            )}</span>
+            <span class="lbl">${names[id]}</span>
             <span class="st">${on ? "Ligado" : st && st.state === "unavailable" ? "—" : "Desligado"}</span>`;
           const dot = b.querySelector(".dot");
           dot.style.color = cor;
@@ -279,13 +301,13 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         tile.className = "tile";
         tile.setAttribute("aria-pressed", on ? "true" : "false");
         tile.disabled = !state || state.state === "unavailable";
-        tile.innerHTML = outletFace(this._kinds, id, state && state.attributes.device_class);
+        tile.innerHTML = outletGlyph(this._kinds, id, state && state.attributes.device_class);
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: id })
         );
         const name = document.createElement("div");
         name.className = "tilename";
-        name.textContent = this._name(id);
+        name.textContent = names[id];
         wrap.append(tile, name);
         grid.appendChild(wrap);
       }
