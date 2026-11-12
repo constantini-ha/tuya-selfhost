@@ -207,6 +207,10 @@ contradicts your instinct, trust the note.
   it: `_needsKinds()` is true while every key of a two-key-or-more device reads
   `outlet` and none has been marked, and tapping that row opens the settings
   rather than the keys. Marking one key is what silences it.
+- A row in the device list wears what the device is, through `_deviceGlyph()`:
+  a socket only when one of its keys is a socket or a USB port, a wall switch
+  otherwise. Drawing the socket on every row made a house of wall switches look
+  like a house of plugs.
 - `outletNames()` lets a key that nobody named take the name of what it is, so
   a USB port reads "USB" and not "Tomada 3". A name given by hand in Home
   Assistant (`name` in the registry, not `original_name`) always wins, and two

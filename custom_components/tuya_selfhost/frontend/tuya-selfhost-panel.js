@@ -312,6 +312,19 @@ class TuyaSelfhostPanel extends HTMLElement {
     return null;
   }
 
+  // The row wears what the device is: a socket only when its keys are sockets.
+  _deviceGlyph(entry) {
+    const plugs = this._gangsOf(entry).some((item) => {
+      const state = this._hass.states[item.entity_id];
+      const kind = outletKind(this._kinds, item.entity_id,
+        state && state.attributes.device_class);
+      return kind !== "key" && kind !== "light";
+    });
+    return plugs
+      ? kindGlyph(this._hass, OUTLET_KINDS.find((k) => k.socket))
+      : '<ha-icon icon="mdi:light-switch"></ha-icon>';
+  }
+
   // A device whose keys are all sockets may be hiding a USB port, and only the
   // house knows. Say so once, until someone marks one of them.
   _needsKinds(entry) {
@@ -1745,7 +1758,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         ${
           remote
             ? '<ha-icon icon="mdi:remote"></ha-icon>'
-            : kindGlyph(this._hass, OUTLET_KINDS.find((k) => k.socket))
+            : this._deviceGlyph(entry)
         }
         <div class="grow">
           <div>${entry.title}</div>
