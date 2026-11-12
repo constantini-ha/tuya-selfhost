@@ -255,7 +255,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
           b.title = names[id];
           b.innerHTML = `
             <span class="dot">${outletGlyph(
-              this._kinds, id, st && st.attributes.device_class,
+              this._hass, this._kinds, id, st && st.attributes.device_class,
               '<ha-icon class="face" icon="mdi:power"></ha-icon>'
             )}</span>
             <span class="lbl">${names[id]}</span>
@@ -301,7 +301,8 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         tile.className = "tile";
         tile.setAttribute("aria-pressed", on ? "true" : "false");
         tile.disabled = !state || state.state === "unavailable";
-        tile.innerHTML = outletGlyph(this._kinds, id, state && state.attributes.device_class);
+        tile.innerHTML = outletGlyph(this._hass, this._kinds, id,
+          state && state.attributes.device_class);
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: id })
         );

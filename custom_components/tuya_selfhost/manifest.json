@@ -24,5 +24,5 @@
         "tuya-device-sharing-sdk~=0.2.4",
         "segno==1.6.6"
     ],
-    "version": "2026.11.35"
+    "version": "2026.11.36"
 }

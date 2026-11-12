@@ -191,10 +191,14 @@ contradicts your instinct, trust the note.
   and the dashboard card follow each other with no new backend.
 - Only the cloud knows a USB port is type C: locally the strip never says. That
   is why the panel asks the house once instead of asking Tuya for an account.
-- The port drawings are ours, in `outlets.js`, because the icon set has no
-  Brazilian socket and its USB icons are plugs with a tail rather than the port
-  you look at. They are inline SVG, so `kindGlyph()` returns markup and not an
-  icon name, and the dashboard card sizes the same `.face` down to 19px.
+- The USB drawings are ours, in `outlets.js`, because the icon set draws USB as
+  a plug with a tail rather than the port you look at. They are inline SVG, so
+  `kindGlyph()` returns markup and not an icon name, and the dashboard card
+  sizes the same `.face` down to 19px.
+- The socket is whichever one is on the wall of that house. `hass.config.country`
+  decides, because a language does not: `en` is a British socket in one house
+  and an American one in the next. The language is only the fallback when the
+  country is empty. Every socket but the Brazilian one comes from the icon set.
 - `outletNames()` lets a key that nobody named take the name of what it is, so
   a USB port reads "USB" and not "Tomada 3". A name given by hand in Home
   Assistant (`name` in the registry, not `original_name`) always wins, and two

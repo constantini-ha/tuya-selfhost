@@ -353,7 +353,8 @@ class TuyaSelfhostPanel extends HTMLElement {
         pick.className = "iconpick";
         pick.setAttribute("aria-pressed", String(current === kind.id));
         pick.title = this._t(kind.label);
-        pick.innerHTML = kindGlyph(kind, '<span class="rocker" style="width:22px"></span>');
+        pick.innerHTML = kindGlyph(this._hass, kind,
+          '<span class="rocker" style="width:22px"></span>');
         pick.addEventListener("click", () => this._setKind(item.entity_id, kind.id));
         picker.appendChild(pick);
       }
@@ -1854,7 +1855,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         tile.className = "tile";
         tile.setAttribute("aria-pressed", on ? "true" : "false");
         tile.disabled = !state || state.state === "unavailable";
-        tile.innerHTML = outletGlyph(this._kinds, item.entity_id,
+        tile.innerHTML = outletGlyph(this._hass, this._kinds, item.entity_id,
           state && state.attributes.device_class);
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: item.entity_id })

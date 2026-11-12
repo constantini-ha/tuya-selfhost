@@ -5,8 +5,9 @@
  * which one is a USB-C port is on the casing, not on the wire. So the house
  * says it once and both the panel and the card draw it.
  *
- * The drawings are ours because the icon set has no Brazilian socket, and the
- * ones it has for USB are plugs with a tail rather than the port you look at.
+ * The USB drawings are ours because the ones in the icon set are plugs with a
+ * tail rather than the port you look at. The sockets come from the icon set,
+ * which has one per country, except the Brazilian one, which it does not.
  */
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
@@ -28,9 +29,30 @@ const USB_C = `<rect x="2" y="8.6" width="20" height="6.8" rx="3.4" fill="none"
   <rect x="6" y="10.85" width="12" height="2.3" rx="1.15" fill="none"
   stroke="currentColor" stroke-width="1.3"/>`;
 
+// The wall here is not the wall everywhere: the house says which country it
+// is in, and only falls back to the language when nobody filled that in.
+const SOCKET_BY_COUNTRY = {
+  BR: "br",
+  GB: "uk", IE: "uk", MT: "uk", CY: "uk", SG: "uk", MY: "uk", HK: "uk", AE: "uk",
+  US: "us", CA: "us", MX: "us", PH: "us", CO: "us", VE: "us",
+  AU: "au", NZ: "au", CN: "au", AR: "au",
+  JP: "jp", CH: "ch", LI: "ch", IT: "it",
+  FR: "fr", BE: "fr", PL: "fr", CZ: "fr", SK: "fr",
+  DE: "de", AT: "de", NL: "de", SE: "de", NO: "de", FI: "de", DK: "de",
+  ES: "de", PT: "de", GR: "de", RO: "de", HU: "de",
+};
+
+const SOCKET_BY_LANGUAGE = { "pt-BR": "br", pt: "de", es: "de", en: "us" };
+
+const SOCKET_ICONS = {
+  uk: "mdi:power-socket-uk", us: "mdi:power-socket-us", au: "mdi:power-socket-au",
+  jp: "mdi:power-socket-jp", ch: "mdi:power-socket-ch", it: "mdi:power-socket-it",
+  fr: "mdi:power-socket-fr", de: "mdi:power-socket-de", eu: "mdi:power-socket-eu",
+};
+
 export const OUTLET_KINDS = [
   { id: "key", label: "kind_key" },
-  { id: "outlet", label: "kind_outlet", svg: SOCKET_BR },
+  { id: "outlet", label: "kind_outlet", socket: true },
   { id: "usb", label: "kind_usb", svg: USB_A },
   { id: "usbc", label: "kind_usbc", svg: USB_C },
   { id: "light", label: "kind_light", icon: "mdi:lightbulb" },
@@ -64,16 +86,33 @@ export function outletKind(kinds, entityId, deviceClass) {
   return deviceClass === "outlet" ? "outlet" : "key";
 }
 
-export function kindGlyph(kind, fallback) {
+function socketOf(hass) {
+  const country = ((hass && hass.config && hass.config.country) || "").toUpperCase();
+  const language = (hass && hass.language) || "";
+  return (
+    SOCKET_BY_COUNTRY[country] ||
+    SOCKET_BY_LANGUAGE[language] ||
+    SOCKET_BY_LANGUAGE[language.split("-")[0]] ||
+    "eu"
+  );
+}
+
+export function kindGlyph(hass, kind, fallback) {
+  if (kind && kind.socket) {
+    const socket = socketOf(hass);
+    return socket === "br"
+      ? `<svg class="face" viewBox="0 0 24 24" aria-hidden="true">${SOCKET_BR}</svg>`
+      : `<ha-icon class="face" icon="${SOCKET_ICONS[socket]}"></ha-icon>`;
+  }
   if (kind && kind.svg)
     return `<svg class="face" viewBox="0 0 24 24" aria-hidden="true">${kind.svg}</svg>`;
   if (kind && kind.icon) return `<ha-icon class="face" icon="${kind.icon}"></ha-icon>`;
   return fallback || '<span class="rocker"></span>';
 }
 
-export function outletGlyph(kinds, entityId, deviceClass, fallback) {
+export function outletGlyph(hass, kinds, entityId, deviceClass, fallback) {
   const id = outletKind(kinds, entityId, deviceClass);
-  return kindGlyph(OUTLET_KINDS.find((k) => k.id === id), fallback);
+  return kindGlyph(hass, OUTLET_KINDS.find((k) => k.id === id), fallback);
 }
 
 /**
