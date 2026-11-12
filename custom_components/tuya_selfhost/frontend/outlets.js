@@ -24,6 +24,19 @@ const USB_A = `<rect x="3" y="7.4" width="18" height="9.2" rx="1.6" fill="none"
   stroke="currentColor" stroke-width="2"/>
   <rect x="6.6" y="11" width="10.8" height="2" rx="1"/>`;
 
+// The bank as it sits on the strip: two USB-A slots and a USB-C, drawn as the
+// ports themselves. Three ports need more height than one, so this glyph has a
+// taller box of its own.
+const USB_BANK = `<rect x="2.6" y="0.8" width="18.8" height="5.8" rx="1.2" fill="none"
+  stroke="currentColor" stroke-width="1.6"/>
+  <rect x="6.3" y="3" width="11.4" height="1.5" rx="0.75"/>
+  <rect x="2.6" y="9.6" width="18.8" height="5.8" rx="1.2" fill="none"
+  stroke="currentColor" stroke-width="1.6"/>
+  <rect x="6.3" y="11.8" width="11.4" height="1.5" rx="0.75"/>
+  <rect x="5.2" y="18.4" width="13.6" height="5.4" rx="2.7" fill="none"
+  stroke="currentColor" stroke-width="1.6"/>
+  <rect x="8.5" y="20.4" width="7" height="1.5" rx="0.75"/>`;
+
 const USB_C = `<rect x="2" y="8.6" width="20" height="6.8" rx="3.4" fill="none"
   stroke="currentColor" stroke-width="2"/>
   <rect x="6" y="10.85" width="12" height="2.3" rx="1.15" fill="none"
@@ -54,6 +67,7 @@ export const OUTLET_KINDS = [
   { id: "key", label: "kind_key" },
   { id: "outlet", label: "kind_outlet", socket: true },
   { id: "usb", label: "kind_usb", svg: USB_A },
+  { id: "usbmix", label: "kind_usbmix", svg: USB_BANK, box: "0 0 24 24.6", tall: true },
   { id: "usbc", label: "kind_usbc", svg: USB_C },
   { id: "light", label: "kind_light", icon: "mdi:lightbulb" },
 ];
@@ -63,6 +77,7 @@ export const OUTLET_CSS = `
 svg.face { fill:currentColor }
 .tile .face { width:46px; height:46px; --mdc-icon-size:34px;
   color:var(--secondary-text-color); opacity:.6 }
+.tile .face.tall { width:60px; height:62px }
 .tile[aria-pressed="true"] .face { color:var(--text-primary-color); opacity:.95 }
 `;
 
@@ -105,7 +120,9 @@ export function kindGlyph(hass, kind, fallback) {
       : `<ha-icon class="face" icon="${SOCKET_ICONS[socket]}"></ha-icon>`;
   }
   if (kind && kind.svg)
-    return `<svg class="face" viewBox="0 0 24 24" aria-hidden="true">${kind.svg}</svg>`;
+    return `<svg class="face${kind.tall ? " tall" : ""}" viewBox="${
+      kind.box || "0 0 24 24"
+    }" aria-hidden="true">${kind.svg}</svg>`;
   if (kind && kind.icon) return `<ha-icon class="face" icon="${kind.icon}"></ha-icon>`;
   return fallback || '<span class="rocker"></span>';
 }

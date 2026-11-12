@@ -109,6 +109,8 @@ ${OUTLET_CSS}
 .kindrow { padding:10px 0 }
 .kindrow + .kindrow { border-top:1px solid var(--divider-color) }
 .iconpick .face { width:22px; height:22px; --mdc-icon-size:22px }
+.dev .face { width:26px; height:26px;
+  color:var(--state-icon-color, var(--primary-text-color)) }
 .actions { display:flex; justify-content:space-around; gap:8px; padding:16px 8px 4px;
   border-top:1px solid var(--divider-color); margin-top:16px }
 .action { display:flex; flex-direction:column; align-items:center; gap:6px; border:none;
@@ -308,6 +310,19 @@ class TuyaSelfhostPanel extends HTMLElement {
       if (label) return label;
     }
     return null;
+  }
+
+  // A device whose keys are all sockets may be hiding a USB port, and only the
+  // house knows. Say so once, until someone marks one of them.
+  _needsKinds(entry) {
+    const gangs = this._gangsOf(entry);
+    if (gangs.length < 2) return false;
+    if (gangs.some((item) => (this._kinds || {})[item.entity_id])) return false;
+    return gangs.every(
+      (item) =>
+        ((this._hass.states[item.entity_id] || { attributes: {} }).attributes
+          .device_class) === "outlet"
+    );
   }
 
   _keyNames(entry, gangs) {
@@ -1727,7 +1742,11 @@ class TuyaSelfhostPanel extends HTMLElement {
       row.className = "dev";
       const controls = remote ? this._controls(remote).length : 0;
       row.innerHTML = `
-        <ha-icon icon="${remote ? "mdi:remote" : "mdi:power-socket-eu"}"></ha-icon>
+        ${
+          remote
+            ? '<ha-icon icon="mdi:remote"></ha-icon>'
+            : kindGlyph(this._hass, OUTLET_KINDS.find((k) => k.socket))
+        }
         <div class="grow">
           <div>${entry.title}</div>
           <div class="muted">${this._t("entities", { n: entities.length })}${
@@ -1736,11 +1755,18 @@ class TuyaSelfhostPanel extends HTMLElement {
               : ""
           }</div>
         </div>
-        ${remote ? `<span class="pill on">${this._t("emitter")}</span>` : ""}`;
+        ${remote ? `<span class="pill on">${this._t("emitter")}</span>` : ""}
+        ${
+          this._needsKinds(entry)
+            ? `<span class="pill">${this._t("mark_keys")}</span>`
+            : ""
+        }`;
       row.style.cursor = "pointer";
+      const mark = this._needsKinds(entry);
       row.addEventListener("click", () => {
         this._open = entry.entry_id;
-        this._settings = false;
+        // A strip just added has keys nobody has told apart yet: start there.
+        this._settings = mark;
         this._config = null;
         this._render();
       });

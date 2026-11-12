@@ -199,6 +199,14 @@ contradicts your instinct, trust the note.
   decides, because a language does not: `en` is a British socket in one house
   and an American one in the next. The language is only the fallback when the
   country is empty. Every socket but the Brazilian one comes from the icon set.
+- A key can be a bank of ports rather than one: `usbmix` draws two USB-A slots
+  and a USB-C, as these strips carry them. Three ports need more height than
+  one, so that kind carries its own `box` and a `tall` class, and `.tile
+  .face.tall` is the only place the glyph grows.
+- A strip just added says nothing about its USB ports, so the device list marks
+  it: `_needsKinds()` is true while every key of a two-key-or-more device reads
+  `outlet` and none has been marked, and tapping that row opens the settings
+  rather than the keys. Marking one key is what silences it.
 - `outletNames()` lets a key that nobody named take the name of what it is, so
   a USB port reads "USB" and not "Tomada 3". A name given by hand in Home
   Assistant (`name` in the registry, not `original_name`) always wins, and two
