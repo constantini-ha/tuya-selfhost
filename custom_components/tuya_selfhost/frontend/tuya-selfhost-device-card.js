@@ -164,7 +164,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
           .device_class,
       })),
       this._kinds,
-      (key) => t(this.hass, key)
+      (key) => t(this._hass, key)
     );
   }
 
@@ -183,12 +183,12 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
   _summary() {
     const states = (this._gangs || []).map((id) => (this._hass.states[id] || {}).state);
     if (!states.length) return "";
-    if (states.every((s) => s === "unavailable")) return t(this.hass, "offline");
+    if (states.every((s) => s === "unavailable")) return t(this._hass, "offline");
     const on = states.filter((s) => s === "on").length;
-    if (!on) return t(this.hass, "all_off_state");
+    if (!on) return t(this._hass, "all_off_state");
     return on === states.length
-      ? t(this.hass, "all_on_state")
-      : t(this.hass, "some_on", { n: on, total: states.length });
+      ? t(this._hass, "all_on_state")
+      : t(this._hass, "some_on", { n: on, total: states.length });
   }
 
   _render() {
@@ -196,9 +196,9 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
     const card = document.createElement("ha-card");
 
     if (this._error) {
-      card.innerHTML = `<div class="empty">Não consegui ler o aparelho: ${this._error}</div>`;
+      card.innerHTML = `<div class="empty">${t(this._hass, "read_failed", { err: this._error })}</div>`;
     } else if (!this._gangs || !this._gangs.length) {
-      card.innerHTML = `<div class="empty">Este aparelho não tem teclas para mostrar.</div>`;
+      card.innerHTML = `<div class="empty">${t(this._hass, "no_keys")}</div>`;
     } else {
       const head = document.createElement("div");
       head.className = "head";
@@ -206,7 +206,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
       head.innerHTML = `
         <span class="glyph"><ha-icon icon="${this._config.icon || "mdi:light-switch"}"></ha-icon></span>
         <span class="grow">
-          <div class="name">${this._config.title || "Aparelho"}</div>
+          <div class="name">${this._config.title || t(this._hass, "col_device")}</div>
           <div class="sub">${[area, this._summary()].filter(Boolean).join(" · ")}</div>
         </span>`;
       const quick = document.createElement("div");
@@ -227,7 +227,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         this._hass.callService("homeassistant", anyOn ? "turn_off" : "turn_on", {
           entity_id: this._gangs,
         }),
-        anyOn ? t(this.hass, "all_off") : t(this.hass, "all_on")
+        anyOn ? t(this._hass, "all_off") : t(this._hass, "all_on")
       );
       // with a key of its own per gang, the all-at-once button is a secondary action
       if (this._gangs.length > 1) geral.classList.add("small");
@@ -259,7 +259,7 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
               '<ha-icon class="face" icon="mdi:power"></ha-icon>'
             )}</span>
             <span class="lbl">${names[id]}</span>
-            <span class="st">${on ? "Ligado" : st && st.state === "unavailable" ? "—" : "Desligado"}</span>`;
+            <span class="st">${on ? t(this._hass, "on") : st && st.state === "unavailable" ? "—" : t(this._hass, "off")}</span>`;
           const dot = b.querySelector(".dot");
           dot.style.color = cor;
           dot.style.opacity = on ? "1" : "0.42";
@@ -324,13 +324,13 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         return b;
       };
       actions.append(
-        action("mdi:flash", t(this.hass, "all_on"), () =>
+        action("mdi:flash", t(this._hass, "all_on"), () =>
           this._hass.callService("homeassistant", "turn_on", { entity_id: this._gangs })
         ),
-        action("mdi:flash-off", t(this.hass, "all_off"), () =>
+        action("mdi:flash-off", t(this._hass, "all_off"), () =>
           this._hass.callService("homeassistant", "turn_off", { entity_id: this._gangs })
         ),
-        action("mdi:cog-outline", t(this.hass, "settings"), () => {
+        action("mdi:cog-outline", t(this._hass, "settings"), () => {
           history.pushState(null, "", "/tuya-selfhost");
           window.dispatchEvent(new CustomEvent("location-changed"));
         })

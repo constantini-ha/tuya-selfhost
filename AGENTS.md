@@ -207,6 +207,9 @@ contradicts your instinct, trust the note.
   it: `_needsKinds()` is true while every key of a two-key-or-more device reads
   `outlet` and none has been marked, and tapping that row opens the settings
   rather than the keys. Marking one key is what silences it.
+- A card has only a `hass` setter, so `this.hass` is undefined and `t(this.hass, …)`
+  quietly falls back to English. Always pass `this._hass`, and never hardcode a
+  label in the card: it shipped with English buttons on a pt-BR phone.
 - A row in the device list wears what the device is, through `_deviceGlyph()`:
   a socket only when one of its keys is a socket or a USB port, a wall switch
   otherwise. Drawing the socket on every row made a house of wall switches look
