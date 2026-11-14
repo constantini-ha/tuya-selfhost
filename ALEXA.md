@@ -97,3 +97,18 @@ the device in the Alexa app and discover it again.
 **Nothing is discovered.** Check that account linking still works by issuing a
 voice command. If commands fail too, the problem is the skill or the Lambda, not
 this configuration.
+
+## Scenes from the panel
+
+A scene made in the Tuya Selfhost panel is a script whose id starts with
+`tuya_scene_`. Alexa lists it as a scene: "Alexa, turn on" and its name. The
+filter needs this line, which the generated block carries and an older,
+hand-written one does not:
+
+```yaml
+      include_entity_globs:
+        - script.tuya_scene_*
+```
+
+With proactive state reporting on, saving, renaming or deleting a scene reaches
+Alexa at once. Without it, say "Alexa, discover devices".

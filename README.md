@@ -101,6 +101,19 @@ signal, recorded and replayed. Full recipe in
 **[LEARNED_REMOTES.md](LEARNED_REMOTES.md)** ·
 [pt-BR](LEARNED_REMOTES.pt-BR.md) · [es](LEARNED_REMOTES.es.md)
 
+## Scenes
+
+The panel opens with **Scenes**: one tap does several things at once, like
+Tap-to-Run in the Smart Life app. Pick a name and an icon, add the steps — a
+device to turn on or off, a learned remote key to press, a wait — and save. A
+scene is an ordinary Home Assistant script whose id starts with `tuya_scene_`,
+so it also works in dashboards and automations.
+
+Saving a scene sends it to Alexa on the spot when the self-hosted skill reports
+state: say "Alexa, turn on" and the name of the scene. The `alexa:` filter must
+let it through, with `script.tuya_scene_*` under `include_entity_globs`; the
+generated block already carries that line.
+
 ## Alexa
 
 The **Alexa configuration** action builds the whole `alexa:` block from your

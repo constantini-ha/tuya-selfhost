@@ -24,6 +24,8 @@ from .infrared import TuyaRemoteCommand
 from .remote import FLAG_SAVE_DELAY, TuyaLocalRemote
 from .remote_keys import (
     OBJECT_ID_PREFIX,
+    SCENE_PREFIX,
+    _alexa_config,
     async_announce_to_alexa,
     async_forget_in_alexa,
 )
@@ -137,6 +139,8 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
         "      include_entity_globs:",
         f"        - button.{OBJECT_ID_PREFIX}_*",
         f"        - switch.{OBJECT_ID_PREFIX}_*",
+        "      # Scenes made in the panel are scripts under this prefix.",
+        f"        - script.{SCENE_PREFIX}*",
         "      include_entities:",
     ]
     lines += [f"        - {entity_id}" for entity_id, _ in entities]
@@ -148,7 +152,7 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
     return {"yaml": "\n".join(lines), "entity_count": len(entities)}
 
 async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
-    """Hand every remote key to Alexa, without waiting for a discovery.
+    """Hand every remote key and panel scene to Alexa, without waiting for a discovery.
 
     `forget` drops endpoints Alexa still shows for keys that no longer exist —
     a scene deleted here leaves no trace there.
@@ -167,9 +171,24 @@ async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
         and not item.disabled_by
         and not item.hidden_by
     ]
-    sent = await async_announce_to_alexa(hass, entity_ids)
+    scenes = [
+        entity_id
+        for entity_id in hass.states.async_entity_ids("script")
+        if entity_id.startswith(f"script.{SCENE_PREFIX}")
+    ]
+    config = _alexa_config(hass)
+    try:
+        exposed = bool(config and config.should_expose(f"script.{SCENE_PREFIX}probe"))
+    except Exception:  # an internal reach, like the rest of the Alexa glue
+        exposed = False
+    sent = await async_announce_to_alexa(
+        hass, entity_ids + (scenes if exposed else [])
+    )
     return {
         "entity_count": len(entity_ids),
+        "scene_count": len(scenes),
+        "alexa": config is not None,
+        "scenes_exposed": exposed,
         "sent": sent,
         "forgotten": len(forget) if forgotten else 0,
     }

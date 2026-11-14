@@ -102,6 +102,20 @@ señal, grabada y repetida. Receta completa en
 **[LEARNED_REMOTES.es.md](LEARNED_REMOTES.es.md)** ·
 [en](LEARNED_REMOTES.md) · [pt-BR](LEARNED_REMOTES.pt-BR.md)
 
+## Escenas
+
+El panel abre con **Escenas**: un toque hace varias cosas a la vez, como el
+Tap-to-Run de la app Smart Life. Elige un nombre y un icono, añade los pasos
+— un dispositivo que encender o apagar, una tecla de mando aprendida que
+pulsar, una espera — y guarda. La escena es un script normal de Home Assistant
+cuyo id empieza por `tuya_scene_`, así que también sirve en paneles y
+automatizaciones.
+
+Al guardar, la escena llega a Alexa al momento cuando la skill self-hosted
+informa del estado: di "Alexa, enciende" y el nombre de la escena. El filtro
+de `alexa:` debe dejarla pasar, con `script.tuya_scene_*` en
+`include_entity_globs`; el bloque generado ya trae esa línea.
+
 ## Alexa
 
 La acción **Configuración de Alexa** genera el bloque `alexa:` completo a partir de

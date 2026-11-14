@@ -25,6 +25,8 @@ from .remote_card import SIGNAL_LAYOUTS, STORAGE_KEY
 _LOGGER = logging.getLogger(__name__)
 
 OBJECT_ID_PREFIX = "tuya_remote"
+# Scenes made in the panel are scripts whose id starts with this.
+SCENE_PREFIX = "tuya_scene_"
 MODEL = "Learned remote"
 ALEXA_ENDPOINT = "/api/alexa/smart_home"
 

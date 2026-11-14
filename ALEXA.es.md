@@ -98,3 +98,18 @@ tienes que olvidar el dispositivo en la app y detectarlo otra vez.
 **No se detecta nada.** Comprueba que la vinculación de cuenta siga funcionando
 dando un comando de voz. Si el comando también falla, el problema está en la
 skill o en el Lambda, no en esta configuración.
+
+## Escenas del panel
+
+Una escena hecha en el panel Tuya Selfhost es un script cuyo id empieza por
+`tuya_scene_`. Alexa la lista como escena: "Alexa, enciende" y su nombre. El
+filtro necesita esta línea, que el bloque generado ya trae y uno antiguo,
+escrito a mano, no tiene:
+
+```yaml
+      include_entity_globs:
+        - script.tuya_scene_*
+```
+
+Con el informe proactivo de estado activo, guardar, renombrar o eliminar una
+escena llega a Alexa al momento. Sin él, di "Alexa, detecta dispositivos".

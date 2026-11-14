@@ -2,6 +2,8 @@ import { t } from "./i18n.js";
 import { OUTLET_CSS, OUTLET_KINDS, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
   outletNames, saveOutletKinds } from "./outlets.js";
 
+import { SCENE_CSS, SceneMethods } from "./scenes.js";
+
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
 const LAYOUT_SUB = "tuya_selfhost/layout/subscribe";
@@ -106,6 +108,7 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
 .tilename { margin-top:8px; font-size:.86em; color:var(--primary-text-color);
   overflow-wrap:anywhere }
 ${OUTLET_CSS}
+${SCENE_CSS}
 .kindrow { padding:10px 0 }
 .kindrow + .kindrow { border-top:1px solid var(--divider-color) }
 .iconpick .face { width:22px; height:22px; --mdc-icon-size:22px }
@@ -171,6 +174,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._editing = false;
     this._ready = false;
     this._config = null;     // active panel-settings tab, null when closed
+    this._scene = null;      // scene being created or edited
   }
 
   _t(key, vars) {
@@ -186,6 +190,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (!this._ready) {
       this._ready = true;
       this._boot();
+      return;
+    }
+    if (!this._open && !this._remote && !this._config && !this._scene) {
+      // A scene saved here, or anywhere else, shows up without a reload.
+      if (this._scenesSignature() !== this._scenes_shown) this._render();
       return;
     }
     // Follow the device the user is looking at, so a toggle lands visibly.
@@ -1286,6 +1295,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._config = this._config ? null : "add";
       this._open = null;
       this._remote = null;
+      this._scene = null;
       this._render();
     });
     bar.append(menu, title, gear);
@@ -1309,7 +1319,9 @@ class TuyaSelfhostPanel extends HTMLElement {
       return;
     }
 
-    if (!(this._entries || []).length && !(this._zigbee || []).length) {
+    if (this._scene) {
+      wrap.appendChild(this._renderScene());
+    } else if (!(this._entries || []).length && !(this._zigbee || []).length) {
       wrap.innerHTML += `<ha-card><div class="pad">${this._t("no_devices")}</div></ha-card>`;
     } else if (this._remote) {
       wrap.appendChild(this._renderRemote());
@@ -1317,6 +1329,8 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._signature_shown = this._signature();
       wrap.appendChild(this._renderDevice());
     } else {
+      this._scenes_shown = this._scenesSignature();
+      wrap.appendChild(this._renderScenes());
       wrap.appendChild(this._renderList());
     }
     this._paint(root);
@@ -2405,5 +2419,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     this.shadowRoot.append(style, root);
   }
 }
+
+Object.assign(TuyaSelfhostPanel.prototype, SceneMethods);
 
 customElements.define("tuya-selfhost-panel", TuyaSelfhostPanel);

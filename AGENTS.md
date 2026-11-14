@@ -370,6 +370,24 @@ contradicts your instinct, trust the note.
   account linking from zero; `ALEXA.md` covers the entity side. Keep the Lambda
   code identical across the three translations.
 
+### Scenes
+
+- A panel scene is a **Home Assistant script** with id `tuya_scene_<slug>`, written
+  through `config/script/config/<id>` (admin only) by `frontend/scenes.js`. No
+  store and no entity of our own: the script engine already has delays, runs
+  from anywhere and Alexa maps `script` to a scene. The id never changes on a
+  rename, so the Alexa endpoint stays the same.
+- Steps the editor does not know (anything edited elsewhere) are kept as `raw`
+  and written back untouched; the rest of the saved config is kept too.
+- `alexa_announce` sends the scenes along with the keys, but only when the filter
+  exposes `script.tuya_scene_*`: a directive for an entity the filter drops is
+  refused, so announcing it would leave a dead scene. The answer carries
+  `alexa`, `scenes_exposed` and `sent`, and the panel words its message by them.
+- The config API takes a moment to turn a saved script into a state; the panel
+  waits for the state before announcing, or the report goes out without it.
+- A test that saves a scene writes the real `scripts.yaml`. Use a wait-only scene
+  so running it switches nothing, and delete it at the end.
+
 ### Bluetooth
 
 - **Detection belongs to the transport, not to the device.** `_switch_transport`

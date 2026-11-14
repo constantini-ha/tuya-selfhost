@@ -98,3 +98,18 @@ também precisa esquecer o aparelho no app e detectar de novo.
 **Nada é detectado.** Confira se o vínculo de conta ainda funciona dando um
 comando de voz. Se o comando também falhar, o problema está na skill ou no
 Lambda, não nesta configuração.
+
+## Cenas do painel
+
+Uma cena feita no painel Tuya Selfhost é um script com id começando em
+`tuya_scene_`. A Alexa lista como cena: "Alexa, ligar" e o nome dela. O filtro
+precisa desta linha, que o bloco gerado já traz e um bloco antigo, escrito à
+mão, não tem:
+
+```yaml
+      include_entity_globs:
+        - script.tuya_scene_*
+```
+
+Com o relatório proativo de estado ligado, salvar, renomear ou excluir uma cena
+chega na Alexa na hora. Sem ele, diga "Alexa, descobrir dispositivos".

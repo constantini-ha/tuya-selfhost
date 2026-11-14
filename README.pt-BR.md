@@ -101,6 +101,20 @@ sinal, gravado e repetido. Receita completa em
 **[LEARNED_REMOTES.pt-BR.md](LEARNED_REMOTES.pt-BR.md)** ·
 [en](LEARNED_REMOTES.md) · [es](LEARNED_REMOTES.es.md)
 
+## Cenas
+
+O painel abre com **Cenas**: um toque faz várias coisas de uma vez, como o
+Executar do aplicativo Smart Life. Escolha um nome e um ícone, adicione os
+passos — um aparelho para ligar ou desligar, uma tecla de controle aprendida
+para pressionar, uma espera — e salve. A cena é um script comum do Home
+Assistant com id começando em `tuya_scene_`, então também serve em dashboards
+e automações.
+
+Ao salvar, a cena vai para a Alexa na hora quando a skill self-hosted reporta
+estado: diga "Alexa, ligar" e o nome da cena. O filtro do `alexa:` precisa
+deixar passar, com `script.tuya_scene_*` em `include_entity_globs`; o bloco
+gerado já traz essa linha.
+
 ## Alexa
 
 A ação **Configuração da Alexa** monta o bloco `alexa:` inteiro a partir das suas
