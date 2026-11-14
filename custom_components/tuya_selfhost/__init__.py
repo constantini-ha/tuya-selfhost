@@ -41,6 +41,7 @@ from .remote_card import async_setup_remote_card
 from .cloud import async_restore_auth
 from .cloud_api import async_setup_cloud_api
 from .services import async_setup_services
+from .zigbee_quirks import async_setup_zigbee_quirks
 
 _LOGGER = logging.getLogger(__name__)
 NOT_FOUND = "Configuration file for %s not found"
@@ -1008,6 +1009,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "Setting up entry for device: %s",
         device_id,
     )
+    # First of all: Zigbee must find the quirks registered when it loads its devices.
+    await async_setup_zigbee_quirks(hass)
     # Start background LAN rediscovery so a device that changes IP (e.g. after a
     # DHCP lease change) is relocated and reconnected without manual
     # reconfiguration. Safe to call repeatedly; only one sweeper is started.

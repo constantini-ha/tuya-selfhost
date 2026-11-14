@@ -110,6 +110,11 @@ signal — a Wi-Fi device that also has Bluetooth appears there, since that is i
 reserve when Wi-Fi drops. **Zigbee** pairs and lists what hangs on Home
 Assistant's own Zigbee network.
 
+Some Tuya Zigbee devices pair and then show no keys, because Home Assistant does
+not know their model yet. The fix for those ships here and loads by itself, with
+nothing to install or configure. Covered today: the Nova Digital SA-6 six-gang
+wall switch (`_TZE28C1000000_gxbdnfrh`), which gains all six keys.
+
 ## Naming the keys
 
 On a device's page, tap the name under a key to rename it; the same field is in

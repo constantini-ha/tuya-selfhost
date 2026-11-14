@@ -465,6 +465,30 @@ contradicts your instinct, trust the note.
   signal, not the event bus, so the panel polls `zha/devices` and diffs instead
   of subscribing to ZHA internals.
 
+### Zigbee quirks
+
+- `zigbee_quirks/` holds quirks for Tuya Zigbee devices that zha-quirks does not
+  cover yet. They used to be a separate integration (`tuya_zha_quirks`); it was
+  folded in here in 2026.11.48 and its repository deleted.
+- One module per device. Importing it registers the quirk (`TuyaQuirkBuilder`
+  ends in `add_to_registry()`), and its `DEVICES` tuple names the
+  (manufacturer, model) pairs it covers, as Zigbee reports them.
+- **Order matters.** ZHA picks a device's quirk when it loads its devices from
+  its database, not when the quirk is registered. So the quirks are registered at
+  the top of `async_setup_entry`, and once Home Assistant has started
+  `_loaded_bare` checks whether ZHA loaded a covered device without a quirk; if
+  so, the ZHA entry is reloaded once and a warning is logged. A reload is enough:
+  the quirk is already in the registry, so no re-pairing and no restart.
+- Do not import `homeassistant.components.zha`. hassfest would then demand `zha`
+  in `after_dependencies`, which makes this integration load **after** ZHA, the
+  one order that does not work. The check reads `hass.data["zha"]` instead, and
+  swallows any error, because that is ZHA's private shape.
+- A new module prefix (`_TZE28C1000000_` here) matches no existing fingerprint
+  even when the datapoints are identical to a covered unit. Give gangs 2..n the
+  device type of endpoint 1 (`SMART_PLUG`), or they come out as `light.*`.
+- The quirk libraries are not on the host, and there is no Docker access. Read
+  them from GitHub at the versions in Home Assistant's `zha/manifest.json`.
+
 ### Testing the frontend
 
 - Playwright drives the real Home Assistant. Browsers live in

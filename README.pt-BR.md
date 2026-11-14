@@ -110,6 +110,12 @@ com o sinal — o aparelho de Wi-Fi que também tem Bluetooth aparece ali, porqu
 essa é a reserva dele quando o Wi-Fi cai. **Zigbee** pareia e lista o que está
 na rede Zigbee do próprio Home Assistant.
 
+Alguns aparelhos Zigbee da Tuya pareiam e não mostram tecla nenhuma, porque o
+Home Assistant ainda não conhece o modelo. A correção para eles vem aqui dentro
+e carrega sozinha, sem nada para instalar ou configurar. Coberto hoje: o
+interruptor de seis teclas Nova Digital SA-6 (`_TZE28C1000000_gxbdnfrh`), que
+ganha as seis teclas.
+
 ## Nome das teclas
 
 Na página do aparelho, toque no nome embaixo de uma tecla para renomear; o

@@ -111,6 +111,12 @@ con su señal — el dispositivo Wi-Fi que también tiene Bluetooth aparece ahí
 porque esa es su reserva cuando el Wi-Fi se cae. **Zigbee** empareja y lista lo
 que cuelga de la red Zigbee del propio Home Assistant.
 
+Algunos dispositivos Zigbee de Tuya se emparejan y no muestran ninguna tecla,
+porque Home Assistant aún no conoce el modelo. La corrección para ellos viene
+aquí dentro y se carga sola, sin nada que instalar ni configurar. Cubierto hoy:
+el interruptor de seis teclas Nova Digital SA-6 (`_TZE28C1000000_gxbdnfrh`), que
+gana las seis teclas.
+
 ## Nombre de las teclas
 
 En la página del dispositivo, toca el nombre debajo de una tecla para
