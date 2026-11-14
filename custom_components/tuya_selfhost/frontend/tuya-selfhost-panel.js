@@ -157,6 +157,13 @@ ${SCENE_CSS}
   padding:14px 12px; color:var(--secondary-text-color); border-bottom:2px solid transparent;
   white-space:nowrap }
 .tab[aria-selected="true"] { color:var(--primary-color); border-bottom-color:var(--primary-color) }
+.subtabs { display:flex; gap:8px; padding:14px 16px 2px; overflow-x:auto; scrollbar-width:none }
+.subtabs::-webkit-scrollbar { display:none }
+.subtab { display:flex; align-items:center; gap:6px; flex:none; min-height:38px; padding:0 14px 0 10px;
+  border-radius:19px; cursor:pointer; font:inherit; font-size:14px; background:transparent;
+  color:var(--primary-text-color); border:1px solid var(--divider-color); --mdc-icon-size:18px }
+.subtab[aria-selected="true"] { background:var(--primary-color); border-color:transparent;
+  color:var(--text-primary-color) }
 .block { padding:16px; border-bottom:1px solid var(--divider-color) }
 .block:last-child { border-bottom:0 }
 .block h3 { margin:0 0 6px; font-size:15px; font-weight:500 }
@@ -1450,9 +1457,12 @@ class TuyaSelfhostPanel extends HTMLElement {
         false,
         true
       );
-      this._report = ((result && result.response) || {}).devices || [];
+      const answer = (result && result.response) || {};
+      this._report = answer.devices || [];
+      this._radios = answer.bluetooth || { available: false, radios: [] };
     } catch (err) {
       this._report = [];
+      this._radios = { available: false, radios: [] };
     }
     this._render();
   }
@@ -1519,7 +1529,6 @@ class TuyaSelfhostPanel extends HTMLElement {
     for (const [id, key] of [
       ["add", "tab_add"],
       ["network", "tab_network"],
-      ["zigbee", "tab_zigbee"],
       ["alexa", "tab_alexa"],
     ]) {
       const tab = document.createElement("button");
@@ -1534,8 +1543,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     card.appendChild(tabs);
 
-    if (this._config === "network") card.appendChild(this._tabNetwork());
-    else if (this._config === "zigbee") card.appendChild(this._tabZigbee());
+    if (this._config === "network") card.appendChild(this._tabNetworks());
     else if (this._config === "alexa") card.appendChild(this._tabAlexa());
     else card.appendChild(this._tabAdd());
     return card;
@@ -1587,6 +1595,102 @@ class TuyaSelfhostPanel extends HTMLElement {
     );
     list.appendChild(open);
     box.appendChild(list);
+    return box;
+  }
+
+  // Every way a device reaches this house, one sub-tab each.
+  _tabNetworks() {
+    const box = document.createElement("div");
+    const kind = this._net || "wifi";
+    const pick = document.createElement("div");
+    pick.className = "subtabs";
+    pick.setAttribute("role", "tablist");
+    for (const [id, icon, key] of [
+      ["wifi", "mdi:wifi", "net_wifi"],
+      ["ble", "mdi:bluetooth", "net_bluetooth"],
+      ["zigbee", "mdi:zigbee", "tab_zigbee"],
+    ]) {
+      const tab = document.createElement("button");
+      tab.className = "subtab";
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-selected", String(kind === id));
+      tab.innerHTML = `<ha-icon icon="${icon}"></ha-icon><span></span>`;
+      tab.querySelector("span").textContent = this._t(key);
+      tab.addEventListener("click", () => {
+        this._net = id;
+        this._render();
+      });
+      pick.appendChild(tab);
+    }
+    box.appendChild(pick);
+    box.appendChild(
+      kind === "zigbee" ? this._tabZigbee() : kind === "ble" ? this._tabBluetooth() : this._tabNetwork()
+    );
+    return box;
+  }
+
+  _signal(rssi) {
+    if (rssi >= -70) return ["ble_strong", "good"];
+    if (rssi >= -85) return ["ble_fair", "warn"];
+    return ["ble_weak", "bad"];
+  }
+
+  _tabBluetooth() {
+    const box = document.createElement("div");
+    const head = document.createElement("div");
+    head.className = "block";
+    head.innerHTML = `<h3></h3><div class="muted"></div>`;
+    head.querySelector("h3").textContent = this._t("ble_title");
+    head.querySelector(".muted").textContent = this._t("ble_intro");
+    box.appendChild(head);
+
+    if (this._report === undefined) {
+      setTimeout(() => this._loadReport(), 0);
+      this._report = "loading";
+    }
+    const body = document.createElement("div");
+    body.className = "block";
+    box.appendChild(body);
+    if (this._report === "loading") {
+      body.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
+      return box;
+    }
+    const report = this._radios || { available: false, radios: [] };
+    if (!report.radios.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = this._t(report.available ? "ble_none" : "ble_off");
+      body.appendChild(empty);
+    }
+    for (const radio of report.radios) {
+      const row = document.createElement("div");
+      row.className = "net";
+      row.innerHTML = `<div class="grow"><div class="name"></div>
+        <div class="muted mono"></div><div class="muted advice"></div></div>`;
+      row.querySelector(".name").textContent = radio.name || this._t("ble_unknown");
+      row.querySelector(".mono").textContent = radio.address +
+        (radio.in_range ? " · " + radio.rssi + " dBm" : "") +
+        (!radio.name && radio.advertised ? " · " + radio.advertised : "");
+      const advice = row.querySelector(".advice");
+      if (radio.reserve) advice.textContent = this._t("ble_reserve");
+      else if (!radio.name) advice.textContent = this._t("ble_unknown_help");
+      else advice.remove();
+      const [label, tone] = radio.in_range ? this._signal(radio.rssi) : ["ble_away", ""];
+      const pill = document.createElement("span");
+      pill.className = "pill " + tone;
+      pill.textContent = this._t(label);
+      row.appendChild(pill);
+      body.appendChild(row);
+    }
+
+    const foot = document.createElement("div");
+    foot.className = "block";
+    const again = document.createElement("button");
+    again.className = "act ghost";
+    again.textContent = this._t("refresh");
+    again.addEventListener("click", () => this._loadReport());
+    foot.appendChild(again);
+    box.appendChild(foot);
     return box;
   }
 

@@ -101,6 +101,15 @@ signal, recorded and replayed. Full recipe in
 **[LEARNED_REMOTES.md](LEARNED_REMOTES.md)** ·
 [pt-BR](LEARNED_REMOTES.pt-BR.md) · [es](LEARNED_REMOTES.es.md)
 
+## Network
+
+The gear at the top has a **Network** tab with one sub-tab per radio. **Wi-Fi**
+lists each device with its address and MAC, ready to block on the router.
+**Bluetooth** shows the Tuya radios Home Assistant hears right now, with their
+signal — a Wi-Fi device that also has Bluetooth appears there, since that is its
+reserve when Wi-Fi drops. **Zigbee** pairs and lists what hangs on Home
+Assistant's own Zigbee network.
+
 ## Naming the keys
 
 On a device's page, tap the name under a key to rename it; the same field is in

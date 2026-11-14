@@ -102,6 +102,15 @@ señal, grabada y repetida. Receta completa en
 **[LEARNED_REMOTES.es.md](LEARNED_REMOTES.es.md)** ·
 [en](LEARNED_REMOTES.md) · [pt-BR](LEARNED_REMOTES.pt-BR.md)
 
+## Red
+
+El engranaje de arriba tiene la pestaña **Red**, con una subpestaña por radio.
+**Wi-Fi** lista cada dispositivo con su dirección y MAC, listo para bloquear en
+el router. **Bluetooth** muestra las radios Tuya que Home Assistant oye ahora,
+con su señal — el dispositivo Wi-Fi que también tiene Bluetooth aparece ahí,
+porque esa es su reserva cuando el Wi-Fi se cae. **Zigbee** empareja y lista lo
+que cuelga de la red Zigbee del propio Home Assistant.
+
 ## Nombre de las teclas
 
 En la página del dispositivo, toca el nombre debajo de una tecla para

@@ -17,7 +17,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import service
 
-from .const import CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
+from .ble.autodetect import _radio_address
+from .const import CONF_BLE, CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .device import get_device_id
 from .helpers.arp import arp_table
 from .infrared import TuyaRemoteCommand
@@ -73,6 +74,13 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
     )
     return True
 
+
+# What a Tuya radio advertises: combo modules use a201, Bluetooth-only ones fd50.
+TUYA_BLE_SERVICES = (
+    "0000a201-0000-1000-8000-00805f9b34fb",
+    "0000fd50-0000-1000-8000-00805f9b34fb",
+)
+TUYA_BLE_MANUFACTURER = 0x07D0
 
 # Domains the Alexa Smart Home integration can expose.
 ALEXA_DOMAINS = frozenset(
@@ -239,7 +247,70 @@ async def async_handle_network_report(hass: HomeAssistant, call: ServiceCall):
         )
 
     devices.sort(key=_host_sort_key)
-    return {"devices": devices}
+    return {"devices": devices, "bluetooth": _bluetooth_report(hass, entries, arp)}
+
+
+def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
+    """Say which Tuya radios Home Assistant's Bluetooth hears right now.
+
+    A Wi-Fi device with a combo module shows up here too, at its Wi-Fi MAC plus
+    one, which is how a heard radio gets the name of a configured device.
+    """
+    try:
+        from homeassistant.components import bluetooth
+
+        heard = list(bluetooth.async_discovered_service_info(hass, connectable=False))
+        available = bluetooth.async_scanner_count(hass, connectable=False) > 0
+    except Exception:  # no Bluetooth integration, or none set up
+        return {"available": False, "radios": []}
+
+    owners: dict[str, tuple[str, bool]] = {}
+    for entry in entries:
+        config = {**entry.data, **entry.options}
+        reserve = (config.get(CONF_BLE) or "").upper()
+        if reserve:
+            owners[reserve] = (entry.title, True)
+        mac = arp.get(config.get(CONF_HOST) or "")
+        if mac:
+            owners.setdefault(_radio_address(mac), (entry.title, False))
+
+    radios = []
+    seen = set()
+    for info in heard:
+        address = info.address.upper()
+        tuya = (
+            any(uuid in (info.service_uuids or []) for uuid in TUYA_BLE_SERVICES)
+            or any(uuid in (info.service_data or {}) for uuid in TUYA_BLE_SERVICES)
+            or TUYA_BLE_MANUFACTURER in (info.manufacturer_data or {})
+        )
+        if address not in owners and not tuya:
+            continue
+        name, reserve = owners.get(address, (None, False))
+        seen.add(address)
+        radios.append(
+            {
+                "address": address,
+                "name": name,
+                "advertised": info.name if info.name != info.address else None,
+                "rssi": info.rssi,
+                "in_range": True,
+                "reserve": reserve,
+            }
+        )
+    for address, (name, reserve) in owners.items():
+        if reserve and address not in seen:
+            radios.append(
+                {
+                    "address": address,
+                    "name": name,
+                    "advertised": None,
+                    "rssi": None,
+                    "in_range": False,
+                    "reserve": True,
+                }
+            )
+    radios.sort(key=lambda radio: (not radio["in_range"], -(radio["rssi"] or -999)))
+    return {"available": available, "radios": radios}
 
 
 async def async_handle_send_ir_command(entity, call: ServiceCall):

@@ -430,6 +430,13 @@ contradicts your instinct, trust the note.
 - The first status read comes back empty; wait `STATUS_SETTLE_STEPS` before
   deciding a device is mute.
 
+- The panel's Network tab has Wi-Fi, Bluetooth and Zigbee sub-tabs (`this._net`).
+  `network_report` answers `bluetooth: {available, radios}` from
+  `bluetooth.async_discovered_service_info(hass, connectable=False)`: anything
+  advertising a201/fd50 or manufacturer 0x07D0, plus any address a configured
+  device owns (its stored reserve, or Wi-Fi MAC plus one from the ARP table). A
+  stored reserve that is not heard is listed as out of reach.
+
 ### Releasing
 
 - This checkout has two remotes, and `gh` resolves to the **upstream**
