@@ -76,10 +76,42 @@ const list = (config, plural, singular) => {
 
 export const AutomationMethods = {
   _autoIds() {
+    const related = this._autoRelated || new Set();
     return Object.keys(this._hass.states)
       .filter((id) => id.startsWith("automation.") &&
-        String(this._hass.states[id].attributes.id || "").startsWith(AUTO_PREFIX))
+        (related.has(id) ||
+          String(this._hass.states[id].attributes.id || "").startsWith(AUTO_PREFIX)))
       .sort((a, b) => this._friendly(a).localeCompare(this._friendly(b)));
+  },
+
+  _buttonOf(raw) {
+    const data = raw && raw.event_type === "zha_event" && raw.event_data;
+    const ieee = data && data.device_ieee;
+    return ieee ? (this._zigbee || []).find((entry) => entry.entry_id === "zha:" + ieee) : null;
+  },
+
+  // Automations made elsewhere that drive these devices belong on this list too.
+  async _findRelatedAutos() {
+    const all = Object.keys(this._hass.states).filter((id) => id.startsWith("automation.")).sort();
+    const key = all.join("|");
+    if (key === this._autoScanned) return;
+    this._autoScanned = key;
+    const needles = [
+      ...Object.values(this._byEntry || {}).flat().map((item) => item.entity_id),
+      ...(this._zigbee || []).map((entry) => entry.entry_id.slice("zha:".length)),
+    ].map((needle) => JSON.stringify(needle));
+    const found = new Set();
+    await Promise.all(all.map(async (entityId) => {
+      try {
+        const reply = await this._hass.callWS({ type: "automation/config", entity_id: entityId });
+        const text = JSON.stringify((reply && reply.config) || {});
+        if (needles.some((needle) => text.includes(needle))) found.add(entityId);
+      } catch (err) {
+        // Not readable by this user, or not made in the editor: leave it out.
+      }
+    }));
+    this._autoRelated = found;
+    if (this._scenes && !this._scene && !this._auto) this._render();
   },
 
   _autosSignature() {
@@ -89,7 +121,10 @@ export const AutomationMethods = {
   },
 
   _clauseText(item, list) {
-    if (item.kind === "raw") return this._t("auto_custom");
+    if (item.kind === "raw") {
+      const button = this._buttonOf(item.raw);
+      return button ? this._t("auto_pressed", { name: button.title }) : this._t("auto_custom");
+    }
     if (item.kind === "time") {
       return list === "triggers"
         ? this._t("auto_at", { time: item.at })
@@ -100,7 +135,9 @@ export const AutomationMethods = {
   },
 
   _clauseIcon(item) {
-    if (item.kind === "raw") return "mdi:code-braces";
+    if (item.kind === "raw") {
+      return this._buttonOf(item.raw) ? "mdi:gesture-tap-button" : "mdi:code-braces";
+    }
     if (item.kind === "time") return "mdi:clock-outline";
     return this._taskIcon({ kind: "do", entity: item.entity });
   },
@@ -214,6 +251,7 @@ export const AutomationMethods = {
   },
 
   _renderAutomations() {
+    this._findRelatedAutos();
     const card = document.createElement("ha-card");
     card.header = this._t("autos");
     const ids = this._autoIds();

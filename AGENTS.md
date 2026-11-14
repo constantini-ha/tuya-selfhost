@@ -413,6 +413,11 @@ contradicts your instinct, trust the note.
 - On/off automations come in pairs. There is no "follow" step on purpose: two
   plain automations stay readable in Home Assistant's own editor.
 - Test with a time trigger and a wait step only, and delete it at the end.
+- The list also shows automations made elsewhere that touch the panel's devices
+  (`_findRelatedAutos`): it reads every automation's config once and looks for a
+  panel entity id or a Zigbee IEEE in it, because `search/related` misses a
+  `zha_event` trigger. Those open with their steps as `raw`, so saving keeps them
+  intact; a `zha_event` trigger is shown as "<button> is pressed".
 
 ### Bluetooth
 
