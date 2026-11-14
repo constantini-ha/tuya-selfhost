@@ -469,7 +469,7 @@ contradicts your instinct, trust the note.
 
 - `zigbee_quirks/` holds quirks for Tuya Zigbee devices that zha-quirks does not
   cover yet. They used to be a separate integration (`tuya_zha_quirks`); it was
-  folded in here in 2026.11.48 and its repository deleted.
+  folded in here in 2026.11.48 and retired. Do not bring it back.
 - One module per device. Importing it registers the quirk (`TuyaQuirkBuilder`
   ends in `add_to_registry()`), and its `DEVICES` tuple names the
   (manufacturer, model) pairs it covers, as Zigbee reports them.
