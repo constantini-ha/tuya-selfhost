@@ -137,6 +137,16 @@ estado: diga "Alexa, ligar" e o nome da cena. O filtro do `alexa:` precisa
 deixar passar, com `script.tuya_scene_*` em `include_entity_globs`; o bloco
 gerado já traz essa linha.
 
+## Automações
+
+A cena roda quando você toca nela. A automação roda sozinha: embaixo das cenas,
+**Nova automação** pede um **Quando** (um aparelho ligar ou desligar, ou um
+horário), um **Se** opcional (um aparelho estar ligado ou desligado, ou só entre
+dois horários) e um **Então** (os mesmos passos de uma cena). "Quando a tecla 5
+ligar, ligue o abajur" é uma automação; desligar de volta é uma segunda. Cada uma
+é uma automação comum do Home Assistant com id começando em `tuya_auto_`, então
+continua valendo com o painel fechado e pode ser pausada na lista.
+
 ## Alexa
 
 A ação **Configuração da Alexa** monta o bloco `alexa:` inteiro a partir das suas

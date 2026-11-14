@@ -139,6 +139,17 @@ informa del estado: di "Alexa, enciende" y el nombre de la escena. El filtro
 de `alexa:` debe dejarla pasar, con `script.tuya_scene_*` en
 `include_entity_globs`; el bloque generado ya trae esa línea.
 
+## Automatizaciones
+
+La escena se ejecuta cuando la tocas. La automatización funciona sola: debajo de
+las escenas, **Nueva automatización** pide un **Cuando** (un dispositivo se
+enciende o se apaga, o una hora), un **Si** opcional (un dispositivo está
+encendido o apagado, o solo entre dos horas) y un **Entonces** (los mismos pasos
+de una escena). "Cuando la tecla 5 se encienda, enciende la lámpara" es una
+automatización; apagarla de nuevo es otra. Cada una es una automatización normal
+de Home Assistant cuyo id empieza por `tuya_auto_`, así que sigue funcionando con
+el panel cerrado y se puede pausar desde la lista.
+
 ## Alexa
 
 La acción **Configuración de Alexa** genera el bloque `alexa:` completo a partir de

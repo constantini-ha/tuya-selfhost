@@ -135,6 +135,16 @@ state: say "Alexa, turn on" and the name of the scene. The `alexa:` filter must
 let it through, with `script.tuya_scene_*` under `include_entity_globs`; the
 generated block already carries that line.
 
+## Automations
+
+A scene runs when you tap it. An automation runs by itself: under the scenes,
+**New automation** asks for a **When** (a device turns on or off, or a time of
+day), an optional **If** (a device is on or off, or only between two times) and a
+**Then** (the same steps a scene has). "When key 5 turns on, turn the lamp on" is
+one automation; turning it off again is a second one. Each is an ordinary Home
+Assistant automation whose id starts with `tuya_auto_`, so it keeps working with
+the panel closed and can be paused from the list.
+
 ## Alexa
 
 The **Alexa configuration** action builds the whole `alexa:` block from your

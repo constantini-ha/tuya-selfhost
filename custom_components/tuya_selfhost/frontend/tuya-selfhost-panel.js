@@ -3,6 +3,7 @@ import { OUTLET_CSS, OUTLET_KINDS, kindGlyph, loadOutletKinds, outletGlyph, outl
   outletNames, saveOutletKinds } from "./outlets.js";
 
 import { SCENE_CSS, SceneMethods } from "./scenes.js";
+import { AUTO_CSS, AutomationMethods } from "./automations.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
@@ -120,6 +121,7 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
   overflow-wrap:anywhere }
 ${OUTLET_CSS}
 ${SCENE_CSS}
+${AUTO_CSS}
 .kindrow { padding:10px 0 }
 .kindrow + .kindrow { border-top:1px solid var(--divider-color) }
 .iconpick .face { width:22px; height:22px; --mdc-icon-size:22px }
@@ -193,6 +195,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._ready = false;
     this._config = null;     // active panel-settings tab, null when closed
     this._scene = null;      // scene being created or edited
+    this._auto = null;       // automation being created or edited
     this._scenes = false;    // the scenes screen is open
     this._renaming = null;   // entity_id of the key whose name is being typed
   }
@@ -212,9 +215,11 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._boot();
       return;
     }
+    // A redraw would throw away the automation being built.
+    if (this._auto) return;
     if (this._scenes && !this._scene) {
       // A scene saved here, or anywhere else, shows up without a reload.
-      if (this._scenesSignature() !== this._scenes_shown) this._render();
+      if (this._scenesShown() !== this._scenes_shown) this._render();
       return;
     }
     // A redraw would throw away the name being typed.
@@ -224,6 +229,10 @@ class TuyaSelfhostPanel extends HTMLElement {
       const signature = this._signature();
       if (signature !== this._signature_shown) this._render();
     }
+  }
+
+  _scenesShown() {
+    return this._scenesSignature() + "#" + this._autosSignature();
   }
 
   _signature() {
@@ -1368,6 +1377,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._open = null;
       this._remote = null;
       this._scene = null;
+      this._auto = null;
       this._scenes = false;
       this._renaming = null;
       this._render();
@@ -1380,6 +1390,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     scenes.addEventListener("click", () => {
       this._scenes = !this._scenes;
       this._scene = null;
+      this._auto = null;
       this._config = null;
       this._open = null;
       this._remote = null;
@@ -1407,11 +1418,13 @@ class TuyaSelfhostPanel extends HTMLElement {
       return;
     }
 
-    if (this._scene) {
+    if (this._auto) {
+      wrap.appendChild(this._renderAuto());
+    } else if (this._scene) {
       wrap.appendChild(this._renderScene());
     } else if (this._scenes) {
-      this._scenes_shown = this._scenesSignature();
-      wrap.appendChild(this._renderScenes());
+      this._scenes_shown = this._scenesShown();
+      wrap.append(this._renderScenes(), this._renderAutomations());
     } else if (!(this._entries || []).length && !(this._zigbee || []).length) {
       wrap.innerHTML += `<ha-card><div class="pad">${this._t("no_devices")}</div></ha-card>`;
     } else if (this._remote) {
@@ -2622,6 +2635,6 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 }
 
-Object.assign(TuyaSelfhostPanel.prototype, SceneMethods);
+Object.assign(TuyaSelfhostPanel.prototype, SceneMethods, AutomationMethods);
 
 customElements.define("tuya-selfhost-panel", TuyaSelfhostPanel);

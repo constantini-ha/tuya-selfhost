@@ -396,6 +396,24 @@ contradicts your instinct, trust the note.
   A blur that changed nothing redraws 150 ms later, so the tap that caused the
   blur still reaches its target.
 
+### Automations
+
+- A scene is not a trigger: it only runs when tapped or asked for. "Key 5 turns
+  the lamp on" needs an automation, and users expect the scene to do it.
+- `frontend/automations.js` builds When / If / Then on the scenes screen. Each is
+  a Home Assistant automation with id `tuya_auto_<slug>`, written through
+  `config/automation/config/<id>` and read with the `automation/config`
+  websocket command. The entity id comes from the alias, so find them by
+  `attributes.id`, never by entity id.
+- Then reuses the scene steps (`_taskRows`, `decode`, `encode`). When knows a
+  state trigger to `on`/`off` and a time; If knows a state and a time window.
+  Anything else is kept as `raw` and written back untouched, as scenes do.
+- Read both `triggers` and `trigger` (and the other two pairs), write the plural,
+  and drop the singular keys from the kept config or Home Assistant gets both.
+- On/off automations come in pairs. There is no "follow" step on purpose: two
+  plain automations stay readable in Home Assistant's own editor.
+- Test with a time trigger and a wait step only, and delete it at the end.
+
 ### Bluetooth
 
 - **Detection belongs to the transport, not to the device.** `_switch_transport`

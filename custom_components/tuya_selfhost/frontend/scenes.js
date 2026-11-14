@@ -16,7 +16,7 @@ const SCENE_ICONS = [
   "mdi:star",
 ];
 
-const ACTS = {
+export const ACTS = {
   switch: ["on", "off", "toggle"],
   light: ["on", "off", "toggle"],
   fan: ["on", "off", "toggle"],
@@ -65,7 +65,7 @@ export const SCENE_CSS = `
 .error { color:var(--error-color,#db4437); font-size:.9em; margin-top:10px }
 `;
 
-function slug(text) {
+export function slug(text) {
   return text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -74,7 +74,7 @@ function slug(text) {
     .replace(/^_+|_+$/g, "");
 }
 
-function decode(step) {
+export function decode(step) {
   if (step && step.delay != null && Object.keys(step).length === 1) {
     const delay = step.delay;
     const seconds = typeof delay === "number"
@@ -92,7 +92,7 @@ function decode(step) {
   return { kind: "raw", raw: step };
 }
 
-function encode(task) {
+export function encode(task) {
   if (task.kind === "wait") return { delay: { seconds: task.seconds } };
   if (task.kind === "do") return { action: SERVICE[task.act], target: { entity_id: task.entity } };
   return task.raw;
@@ -113,7 +113,7 @@ export const SceneMethods = {
     return !!(this._hass.user && this._hass.user.is_admin);
   },
 
-  _sceneTargets() {
+  _sceneTargets(domains = Object.keys(ACTS)) {
     const all = [...(this._entries || []), ...(this._zigbee || [])];
     return all
       .map((entry) => ({
@@ -122,7 +122,7 @@ export const SceneMethods = {
         items: this._sorted(
           (this._byEntry[entry.entry_id] || []).filter(
             (item) =>
-              ACTS[item.entity_id.split(".")[0]] &&
+              domains.includes(item.entity_id.split(".")[0]) &&
               !item.entity_category &&
               this._hass.states[item.entity_id]
           )
@@ -338,6 +338,84 @@ export const SceneMethods = {
     return card;
   },
 
+  _select(label, options, value, onChange) {
+    const node = document.createElement("select");
+    node.setAttribute("aria-label", label);
+    for (const [id, text] of options) {
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = text;
+      option.selected = id === value;
+      node.appendChild(option);
+    }
+    node.addEventListener("change", () => {
+      onChange(node.value);
+      this._render();
+    });
+    return node;
+  },
+
+  _rowTool(icon, label, onClick, off) {
+    const button = document.createElement("button");
+    button.className = "icon";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.disabled = !!off;
+    if (off) button.style.opacity = ".3";
+    button.innerHTML = `<ha-icon icon="${icon}"></ha-icon>`;
+    button.addEventListener("click", onClick);
+    return button;
+  },
+
+  _taskRows(draft, pad) {
+    draft.tasks.forEach((task, index) => {
+      const row = document.createElement("div");
+      row.className = "task";
+      row.innerHTML = `<span class="num">${index + 1}</span><ha-icon></ha-icon><div class="grow"></div>`;
+      row.querySelector("ha-icon").setAttribute("icon", this._taskIcon(task));
+      row.querySelector(".grow").textContent = this._taskText(task);
+      const move = (delta) => {
+        const [item] = draft.tasks.splice(index, 1);
+        draft.tasks.splice(index + delta, 0, item);
+        this._render();
+      };
+      row.append(
+        this._rowTool("mdi:arrow-up", this._t("scene_move_up"), () => move(-1), index === 0),
+        this._rowTool("mdi:arrow-down", this._t("scene_move_down"), () => move(1),
+          index === draft.tasks.length - 1),
+        this._rowTool("mdi:close", this._t("scene_remove_task"), () => {
+          draft.tasks.splice(index, 1);
+          this._render();
+        })
+      );
+      pad.appendChild(row);
+    });
+
+    if (draft.adding) {
+      pad.appendChild(this._sceneAdder(draft));
+      return;
+    }
+    const more = document.createElement("div");
+    more.className = "row";
+    more.style.marginTop = "12px";
+    const task = document.createElement("button");
+    task.className = "act ghost";
+    task.textContent = "+ " + this._t("scene_add_task");
+    task.addEventListener("click", () => {
+      draft.adding = { kind: "do" };
+      this._render();
+    });
+    const wait = document.createElement("button");
+    wait.className = "act ghost";
+    wait.textContent = "+ " + this._t("scene_add_wait");
+    wait.addEventListener("click", () => {
+      draft.adding = { kind: "wait", seconds: 5 };
+      this._render();
+    });
+    more.append(task, wait);
+    pad.appendChild(more);
+  },
+
   _sceneAdder(draft) {
     const adding = draft.adding;
     const box = document.createElement("div");
@@ -390,22 +468,7 @@ export const SceneMethods = {
       adding.entity = entity.entity_id;
       const acts = ACTS[adding.entity.split(".")[0]];
       if (!acts.includes(adding.act)) adding.act = acts[0];
-      const select = (label, options, value, onChange) => {
-        const node = document.createElement("select");
-        node.setAttribute("aria-label", label);
-        for (const [id, text] of options) {
-          const option = document.createElement("option");
-          option.value = id;
-          option.textContent = text;
-          option.selected = id === value;
-          node.appendChild(option);
-        }
-        node.addEventListener("change", () => {
-          onChange(node.value);
-          this._render();
-        });
-        return node;
-      };
+      const select = (...args) => this._select(...args);
       box.append(
         select(this._t("scene_pick_device"), targets.map((item) => [item.id, item.title]),
           adding.device, (value) => { adding.device = value; adding.entity = null; }),
@@ -468,63 +531,7 @@ export const SceneMethods = {
     heading.textContent = this._t(draft.tasks.length ? "scene_tasks" : "scene_tasks_empty");
     pad.appendChild(heading);
 
-    draft.tasks.forEach((task, index) => {
-      const row = document.createElement("div");
-      row.className = "task";
-      row.innerHTML = `<span class="num">${index + 1}</span><ha-icon></ha-icon><div class="grow"></div>`;
-      row.querySelector("ha-icon").setAttribute("icon", this._taskIcon(task));
-      row.querySelector(".grow").textContent = this._taskText(task);
-      const tool = (icon, label, onClick, off) => {
-        const button = document.createElement("button");
-        button.className = "icon";
-        button.title = label;
-        button.setAttribute("aria-label", label);
-        button.disabled = !!off;
-        if (off) button.style.opacity = ".3";
-        button.innerHTML = `<ha-icon icon="${icon}"></ha-icon>`;
-        button.addEventListener("click", onClick);
-        return button;
-      };
-      const move = (delta) => {
-        const [item] = draft.tasks.splice(index, 1);
-        draft.tasks.splice(index + delta, 0, item);
-        this._render();
-      };
-      row.append(
-        tool("mdi:arrow-up", this._t("scene_move_up"), () => move(-1), index === 0),
-        tool("mdi:arrow-down", this._t("scene_move_down"), () => move(1),
-          index === draft.tasks.length - 1),
-        tool("mdi:close", this._t("scene_remove_task"), () => {
-          draft.tasks.splice(index, 1);
-          this._render();
-        })
-      );
-      pad.appendChild(row);
-    });
-
-    if (draft.adding) {
-      pad.appendChild(this._sceneAdder(draft));
-    } else {
-      const more = document.createElement("div");
-      more.className = "row";
-      more.style.marginTop = "12px";
-      const task = document.createElement("button");
-      task.className = "act ghost";
-      task.textContent = "+ " + this._t("scene_add_task");
-      task.addEventListener("click", () => {
-        draft.adding = { kind: "do" };
-        this._render();
-      });
-      const wait = document.createElement("button");
-      wait.className = "act ghost";
-      wait.textContent = "+ " + this._t("scene_add_wait");
-      wait.addEventListener("click", () => {
-        draft.adding = { kind: "wait", seconds: 5 };
-        this._render();
-      });
-      more.append(task, wait);
-      pad.appendChild(more);
-    }
+    this._taskRows(draft, pad);
 
     if (draft.error) {
       const error = document.createElement("div");
