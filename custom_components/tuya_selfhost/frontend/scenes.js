@@ -274,6 +274,18 @@ export const SceneMethods = {
   _renderScenes() {
     const card = document.createElement("ha-card");
     card.header = this._t("scenes");
+    const head = document.createElement("div");
+    head.className = "pad row";
+    head.style.paddingTop = "0";
+    const back = document.createElement("button");
+    back.className = "act ghost";
+    back.textContent = this._t("back_devices");
+    back.addEventListener("click", () => {
+      this._scenes = false;
+      this._render();
+    });
+    head.appendChild(back);
+    card.appendChild(head);
     const ids = this._sceneIds();
     const admin = this._isAdmin();
     if (!ids.length) {

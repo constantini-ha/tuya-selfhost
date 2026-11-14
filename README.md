@@ -101,9 +101,16 @@ signal, recorded and replayed. Full recipe in
 **[LEARNED_REMOTES.md](LEARNED_REMOTES.md)** ·
 [pt-BR](LEARNED_REMOTES.pt-BR.md) · [es](LEARNED_REMOTES.es.md)
 
+## Naming the keys
+
+On a device's page, tap the name under a key to rename it; the same field is in
+the device's settings. The name goes to Home Assistant's entity registry, so
+dashboards and voice assistants get it too. An empty name brings the original
+back.
+
 ## Scenes
 
-The panel opens with **Scenes**: one tap does several things at once, like
+The **Scenes** button at the top of the panel opens them: one tap does several things at once, like
 Tap-to-Run in the Smart Life app. Pick a name and an icon, add the steps — a
 device to turn on or off, a learned remote key to press, a wait — and save. A
 scene is an ordinary Home Assistant script whose id starts with `tuya_scene_`,

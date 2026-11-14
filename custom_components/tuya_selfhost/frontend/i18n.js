@@ -254,6 +254,8 @@ const STRINGS = {
     "scene_saved_discover": "Scene saved. Alexa did not take it right away: say \u201cAlexa, discover devices\u201d.",
     "scene_saved_filter": "Scene saved. For Alexa to see it, add script.tuya_scene_* to include_entity_globs under alexa: in configuration.yaml and restart.",
     "scene_deleted": "Scene deleted.",
+    "rename_key": "Rename",
+    "rename_failed": "Could not rename: {err}",
   },
   "pt-BR": {
     devices: "Seus aparelhos",
@@ -507,6 +509,8 @@ const STRINGS = {
     "scene_saved_discover": "Cena salva. A Alexa n\u00e3o aceitou na hora: diga \u201cAlexa, descobrir dispositivos\u201d.",
     "scene_saved_filter": "Cena salva. Para a Alexa enxergar, adicione script.tuya_scene_* em include_entity_globs no alexa: do configuration.yaml e reinicie.",
     "scene_deleted": "Cena exclu\u00edda.",
+    "rename_key": "Renomear",
+    "rename_failed": "N\u00e3o consegui renomear: {err}",
   },
   es: {
     devices: "Tus dispositivos",
@@ -760,6 +764,8 @@ const STRINGS = {
     "scene_saved_discover": "Escena guardada. Alexa no la acept\u00f3 al momento: di \u201cAlexa, detecta dispositivos\u201d.",
     "scene_saved_filter": "Escena guardada. Para que Alexa la vea, a\u00f1ade script.tuya_scene_* a include_entity_globs en alexa: de configuration.yaml y reinicia.",
     "scene_deleted": "Escena eliminada.",
+    "rename_key": "Renombrar",
+    "rename_failed": "No pude renombrar: {err}",
   },
 };
 

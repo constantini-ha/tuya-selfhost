@@ -388,6 +388,14 @@ contradicts your instinct, trust the note.
 - A test that saves a scene writes the real `scripts.yaml`. Use a wait-only scene
   so running it switches nothing, and delete it at the end.
 
+- Scenes sit behind a pill in the header (`this._scenes`), not on the device list:
+  the list is for devices, and the user asked for it that way.
+- A key is renamed through `config/entity_registry/update` with `name`; `null`
+  restores the original. While a name is being typed (`this._renaming`) the
+  `hass` setter must not redraw, or the field loses focus on every state change.
+  A blur that changed nothing redraws 150 ms later, so the tap that caused the
+  blur still reaches its target.
+
 ### Bluetooth
 
 - **Detection belongs to the transport, not to the device.** `_switch_transport`

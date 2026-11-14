@@ -101,9 +101,16 @@ sinal, gravado e repetido. Receita completa em
 **[LEARNED_REMOTES.pt-BR.md](LEARNED_REMOTES.pt-BR.md)** ·
 [en](LEARNED_REMOTES.md) · [es](LEARNED_REMOTES.es.md)
 
+## Nome das teclas
+
+Na página do aparelho, toque no nome embaixo de uma tecla para renomear; o
+mesmo campo está nas configurações do aparelho. O nome vai para o registro de
+entidades do Home Assistant, então dashboards e assistentes de voz também o
+recebem. Deixar vazio traz o nome original de volta.
+
 ## Cenas
 
-O painel abre com **Cenas**: um toque faz várias coisas de uma vez, como o
+O botão **Cenas**, no topo do painel, abre a tela delas: um toque faz várias coisas de uma vez, como o
 Executar do aplicativo Smart Life. Escolha um nome e um ícone, adicione os
 passos — um aparelho para ligar ou desligar, uma tecla de controle aprendida
 para pressionar, uma espera — e salve. A cena é um script comum do Home

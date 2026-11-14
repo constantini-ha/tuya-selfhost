@@ -31,6 +31,17 @@ const STYLE = `
 .bar button.menu { border:none; background:transparent; color:inherit; cursor:pointer;
   padding:8px; border-radius:50%; display:flex; line-height:0 }
 .bar button.menu:hover { background:rgba(127,127,127,.18) }
+.bar .barpill { display:flex; align-items:center; gap:6px; min-height:36px; padding:0 14px 0 10px;
+  border-radius:18px; cursor:pointer; font:inherit; font-size:14px; color:inherit;
+  background:transparent; border:1px solid color-mix(in srgb, currentColor 30%, transparent);
+  --mdc-icon-size:20px }
+.bar .barpill[aria-pressed="true"] { background:var(--primary-color); border-color:transparent;
+  color:var(--text-primary-color) }
+.tilename.can { display:inline-flex; align-items:center; gap:4px; border:none; background:none;
+  font:inherit; font-size:.86em; cursor:pointer; padding:4px 2px; --mdc-icon-size:14px }
+.tilename.can ha-icon { color:var(--secondary-text-color) }
+input.rename { width:100%; box-sizing:border-box; margin-top:6px; font-size:16px; text-align:center }
+.kindrow input.rename { text-align:left; margin:0 0 2px }
 button.icon { border:none; background:transparent; color:var(--secondary-text-color);
   cursor:pointer; padding:6px; border-radius:50%; display:flex; --mdc-icon-size:22px }
 button.icon:hover { background:rgba(127,127,127,.18) }
@@ -175,6 +186,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._ready = false;
     this._config = null;     // active panel-settings tab, null when closed
     this._scene = null;      // scene being created or edited
+    this._scenes = false;    // the scenes screen is open
+    this._renaming = null;   // entity_id of the key whose name is being typed
   }
 
   _t(key, vars) {
@@ -192,11 +205,13 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._boot();
       return;
     }
-    if (!this._open && !this._remote && !this._config && !this._scene) {
+    if (this._scenes && !this._scene) {
       // A scene saved here, or anywhere else, shows up without a reload.
       if (this._scenesSignature() !== this._scenes_shown) this._render();
       return;
     }
+    // A redraw would throw away the name being typed.
+    if (this._renaming) return;
     // Follow the device the user is looking at, so a toggle lands visibly.
     if (this._open && !this._remote) {
       const signature = this._signature();
@@ -361,6 +376,58 @@ class TuyaSelfhostPanel extends HTMLElement {
     );
   }
 
+  // The name lives in the entity registry, so dashboards and voice get it too.
+  async _renameKey(entry, item, text) {
+    const name = text.trim() || null;
+    this._renaming = null;
+    if (name === (item.name || null)) {
+      // Later, so the tap that took the focus away still lands on what it aimed at.
+      setTimeout(() => this._render(), 150);
+      return;
+    }
+    const before = this._friendly(item.entity_id);
+    try {
+      await this._hass.callWS({
+        type: "config/entity_registry/update", entity_id: item.entity_id, name,
+      });
+      item.name = name;
+      // The state carries the old name until Home Assistant writes it again.
+      for (let tries = 0; tries < 10 && this._friendly(item.entity_id) === before; tries += 1) {
+        await new Promise((done) => setTimeout(done, 150));
+      }
+    } catch (err) {
+      this._flash = this._t("rename_failed", { err: err.message || String(err) });
+    }
+    this._render();
+  }
+
+  _renameInput(entry, item, shown) {
+    const input = document.createElement("input");
+    input.className = "rename";
+    input.value = item.name ? shown : "";
+    input.placeholder = shown;
+    input.maxLength = 40;
+    input.enterKeyHint = "done";
+    input.setAttribute("aria-label", this._t("rename_key"));
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      if (save) this._renameKey(entry, item, input.value);
+      else {
+        this._renaming = null;
+        this._render();
+      }
+    };
+    input.addEventListener("focus", () => { this._renaming = item.entity_id; });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") finish(true);
+      if (event.key === "Escape") finish(false);
+    });
+    input.addEventListener("blur", () => finish(true));
+    return input;
+  }
+
   _kindsBlock(entry, gangs) {
     if (!gangs.length) return null;
     const box = document.createElement("div");
@@ -378,8 +445,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     for (const item of gangs) {
       const row = document.createElement("div");
       row.className = "kindrow";
-      const name = document.createElement("div");
-      name.textContent = names[item.entity_id];
+      const name = this._renameInput(entry, item, names[item.entity_id]);
       const picker = document.createElement("div");
       picker.className = "icons";
       const state = this._hass.states[item.entity_id];
@@ -1288,7 +1354,6 @@ class TuyaSelfhostPanel extends HTMLElement {
     title.textContent = "Tuya Selfhost";
     const gear = document.createElement("button");
     gear.className = "menu";
-    gear.style.marginLeft = "auto";
     gear.title = this._t("settings");
     gear.innerHTML = `<ha-icon icon="mdi:cog-outline"></ha-icon>`;
     gear.addEventListener("click", () => {
@@ -1296,9 +1361,25 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._open = null;
       this._remote = null;
       this._scene = null;
+      this._scenes = false;
+      this._renaming = null;
       this._render();
     });
-    bar.append(menu, title, gear);
+    const scenes = document.createElement("button");
+    scenes.className = "barpill";
+    scenes.setAttribute("aria-pressed", String(this._scenes));
+    scenes.innerHTML = `<ha-icon icon="mdi:play-circle-outline"></ha-icon><span></span>`;
+    scenes.querySelector("span").textContent = this._t("scenes");
+    scenes.addEventListener("click", () => {
+      this._scenes = !this._scenes;
+      this._scene = null;
+      this._config = null;
+      this._open = null;
+      this._remote = null;
+      this._renaming = null;
+      this._render();
+    });
+    bar.append(menu, title, scenes, gear);
     root.appendChild(bar);
 
     const wrap = document.createElement("div");
@@ -1321,6 +1402,9 @@ class TuyaSelfhostPanel extends HTMLElement {
 
     if (this._scene) {
       wrap.appendChild(this._renderScene());
+    } else if (this._scenes) {
+      this._scenes_shown = this._scenesSignature();
+      wrap.appendChild(this._renderScenes());
     } else if (!(this._entries || []).length && !(this._zigbee || []).length) {
       wrap.innerHTML += `<ha-card><div class="pad">${this._t("no_devices")}</div></ha-card>`;
     } else if (this._remote) {
@@ -1329,8 +1413,6 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._signature_shown = this._signature();
       wrap.appendChild(this._renderDevice());
     } else {
-      this._scenes_shown = this._scenesSignature();
-      wrap.appendChild(this._renderScenes());
       wrap.appendChild(this._renderList());
     }
     this._paint(root);
@@ -1913,9 +1995,25 @@ class TuyaSelfhostPanel extends HTMLElement {
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: item.entity_id })
         );
-        const name = document.createElement("div");
-        name.className = "tilename";
-        name.textContent = names[item.entity_id];
+        let name;
+        if (this._renaming === item.entity_id) {
+          name = this._renameInput(entry, item, names[item.entity_id]);
+          setTimeout(() => name.focus(), 0);
+        } else if (item.config_entry_id && this._isAdmin()) {
+          name = document.createElement("button");
+          name.className = "tilename can";
+          name.title = this._t("rename_key");
+          name.innerHTML = `<span></span><ha-icon icon="mdi:pencil-outline"></ha-icon>`;
+          name.querySelector("span").textContent = names[item.entity_id];
+          name.addEventListener("click", () => {
+            this._renaming = item.entity_id;
+            this._render();
+          });
+        } else {
+          name = document.createElement("div");
+          name.className = "tilename";
+          name.textContent = names[item.entity_id];
+        }
         wrap.append(tile, name);
         grid.appendChild(wrap);
       }

@@ -102,9 +102,17 @@ señal, grabada y repetida. Receta completa en
 **[LEARNED_REMOTES.es.md](LEARNED_REMOTES.es.md)** ·
 [en](LEARNED_REMOTES.md) · [pt-BR](LEARNED_REMOTES.pt-BR.md)
 
+## Nombre de las teclas
+
+En la página del dispositivo, toca el nombre debajo de una tecla para
+renombrarla; el mismo campo está en los ajustes del dispositivo. El nombre va
+al registro de entidades de Home Assistant, así que los paneles y los
+asistentes de voz también lo reciben. Dejarlo vacío recupera el nombre
+original.
+
 ## Escenas
 
-El panel abre con **Escenas**: un toque hace varias cosas a la vez, como el
+El botón **Escenas**, arriba en el panel, abre su pantalla: un toque hace varias cosas a la vez, como el
 Tap-to-Run de la app Smart Life. Elige un nombre y un icono, añade los pasos
 — un dispositivo que encender o apagar, una tecla de mando aprendida que
 pulsar, una espera — y guarda. La escena es un script normal de Home Assistant
