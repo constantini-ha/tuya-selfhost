@@ -475,6 +475,11 @@ contradicts your instinct, trust the note.
   which app is installed, so both are offered. The schemes are undocumented:
   `smartlife://` was confirmed by hand on the owner's iPhone (Safari asks to
   open the app), `tuyasmart://` was never tested.
+- **A custom-scheme link needs `target="_blank"` inside the Home Assistant iOS
+  app.** A plain `href="smartlife://"` does nothing there. The app's
+  `createWebViewWith` passes new-window requests to `openURLInBrowser`, which
+  hands any non-http scheme to the system (`WebViewController+WebKitDelegates.swift`,
+  `Utils.swift` in home-assistant/iOS).
 - The owner finds this screen self-explanatory: headings, field and buttons,
   with one short line for the path to the user code. Do not add paragraphs. It opens the app's home, not
   the User Code screen, and nothing found replaces the QR scan with a link.

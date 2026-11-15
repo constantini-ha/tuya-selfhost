@@ -1276,6 +1276,9 @@ class TuyaSelfhostPanel extends HTMLElement {
         const open = document.createElement("a");
         open.className = "link";
         open.href = scheme;
+        // The Home Assistant app only hands a link to iOS when it asks for a new window.
+        open.target = "_blank";
+        open.rel = "noreferrer";
         open.style.padding = "6px 0";
         open.textContent = this._t(label);
         apps.appendChild(open);
