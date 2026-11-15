@@ -72,6 +72,7 @@ const STRINGS = {
     cloud_where:
       "In the app: Settings → Account and Security → User Code.",
     cloud_enter: "Sign in to Tuya",
+    cloud_remember: "Save the code for next time",
     cloud_open_smartlife: "Open Smart Life",
     cloud_open_tuya: "Open Tuya",
     cloud_asking: "Asking Tuya for a code…",
@@ -383,6 +384,7 @@ const STRINGS = {
     cloud_where:
       "No app: Configurações → Conta e segurança → Código de usuário.",
     cloud_enter: "Entrar na Tuya",
+    cloud_remember: "Salvar o código para a próxima vez",
     cloud_open_smartlife: "Abrir Smart Life",
     cloud_open_tuya: "Abrir Tuya",
     cloud_asking: "Pedindo o código à Tuya…",
@@ -694,6 +696,7 @@ const STRINGS = {
     cloud_where:
       "En la app: Configuración → Cuenta y seguridad → Código de usuario.",
     cloud_enter: "Entrar en Tuya",
+    cloud_remember: "Guardar el código para la próxima vez",
     cloud_open_smartlife: "Abrir Smart Life",
     cloud_open_tuya: "Abrir Tuya",
     cloud_asking: "Pidiéndole el código a Tuya…",

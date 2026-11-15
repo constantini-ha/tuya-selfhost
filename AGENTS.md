@@ -481,8 +481,9 @@ contradicts your instinct, trust the note.
 
 - The last user code Tuya accepted is kept in its own store
   (`tuya_selfhost_last_user_code`), apart from `auth_cache`, which sign-out
-  wipes. `cloud/status` answers it when nobody is signed in, so the field comes
-  prefilled on any device.
+  wipes. `cloud/status` answers it, so the field comes prefilled on any device.
+  The owner asked for a visible choice: the "Save the code for next time" box
+  (checked by default) sends `remember`; unchecked, the stored code is erased.
 
 ### Releasing
 

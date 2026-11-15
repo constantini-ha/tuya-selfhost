@@ -1106,13 +1106,14 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   // ---------- Tuya account ----------
 
-  async _cloudQr(userCode) {
+  async _cloudQr(userCode, remember = true) {
     this._login = { busy: true, user_code: userCode };
     this._render();
     try {
       const result = await this._hass.callWS({
         type: CLOUD_QR,
         user_code: userCode,
+        remember,
       });
       this._login = result.error
         ? { failed: result.error, user_code: userCode }
@@ -1135,8 +1136,8 @@ class TuyaSelfhostPanel extends HTMLElement {
         result = {};
       }
       if (result.ok) {
-        this._cloud = { authenticated: true, user_code: this._login.user_code };
         this._login = null;
+        await this._cloudStatus();
         this._flash = this._t("cloud_done");
         this._render();
         return;
@@ -1241,7 +1242,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     go.textContent = this._t("cloud_enter");
     const start = () => {
       const code = input.value.trim();
-      if (code) this._cloudQr(code);
+      if (code) this._cloudQr(code, keep.checked);
     };
     go.addEventListener("click", start);
     input.addEventListener("keydown", (ev) => {
@@ -1249,6 +1250,16 @@ class TuyaSelfhostPanel extends HTMLElement {
     });
     field.append(input, go);
     box.appendChild(field);
+    const remember = document.createElement("label");
+    remember.className = "muted";
+    remember.style.cssText =
+      "display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer";
+    const keep = document.createElement("input");
+    keep.type = "checkbox";
+    keep.checked = true;
+    keep.style.accentColor = "var(--primary-color)";
+    remember.append(keep, this._t("cloud_remember"));
+    box.appendChild(remember);
     box.insertAdjacentHTML(
       "beforeend",
       `<div class="muted" style="margin-top:8px">${this._t("cloud_where")}</div>`

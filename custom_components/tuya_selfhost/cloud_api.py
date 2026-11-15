@@ -44,9 +44,7 @@ def _login_state(hass: HomeAssistant) -> dict[str, Any]:
 
 
 def _remember_code(hass: HomeAssistant, user_code: str) -> None:
-    """Keep the last code Tuya accepted, to offer it again after a sign-out."""
-    if not user_code:
-        return
+    """Keep the last code Tuya accepted, or forget it when given an empty one."""
     hass.data[DOMAIN][LAST_CODE_KEY] = user_code
     hass.data[DOMAIN]["last_code_store"].async_delay_save(
         lambda: {"user_code": hass.data[DOMAIN].get(LAST_CODE_KEY, "")}, 1
@@ -68,8 +66,7 @@ def websocket_cloud_status(hass, connection, msg) -> None:
         msg["id"],
         {
             "authenticated": bool(cached),
-            "user_code": cached.get("user_code")
-            or (hass.data.get(DOMAIN) or {}).get(LAST_CODE_KEY, ""),
+            "user_code": (hass.data.get(DOMAIN) or {}).get(LAST_CODE_KEY, ""),
         },
     )
 
@@ -79,6 +76,7 @@ def websocket_cloud_status(hass, connection, msg) -> None:
     {
         vol.Required("type"): f"{DOMAIN}/cloud/qr",
         vol.Required("user_code"): str,
+        vol.Optional("remember", default=True): bool,
     }
 )
 @websocket_api.async_response
@@ -97,7 +95,7 @@ async def websocket_cloud_qr(hass, connection, msg) -> None:
         return
     state["cloud"] = cloud
     state["token"] = token
-    _remember_code(hass, user_code)
+    _remember_code(hass, user_code if msg["remember"] else "")
     connection.send_result(msg["id"], {"rows": _qr_rows(QR_PREFIX + token)})
 
 
@@ -128,7 +126,5 @@ async def websocket_cloud_login(hass, connection, msg) -> None:
 async def websocket_cloud_logout(hass, connection, msg) -> None:
     """Forget the account."""
     _login_state(hass).clear()
-    cached = (hass.data.get(DOMAIN) or {}).get("auth_cache") or {}
-    _remember_code(hass, cached.get("user_code", ""))
     Cloud(hass).logout()
     connection.send_result(msg["id"], {"ok": True})
