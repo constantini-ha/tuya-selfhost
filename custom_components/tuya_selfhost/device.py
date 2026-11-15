@@ -94,7 +94,6 @@ class TuyaLocalDevice(object):
         self._api_protocol_version_index = None
         self._api_protocol_working = False
         self._api_standby = None
-        self._standby_detect = (False, None)
         self._api_working_protocol_failures = 0
         self.dev_cid = dev_cid
         try:
@@ -206,6 +205,11 @@ class TuyaLocalDevice(object):
         """Return True if the device has returned some state."""
         cached = self._get_cached_state()
         return len(cached) > 1 or cached.get("updated_at", 0) > 0
+
+    @property
+    def has_reserve(self):
+        """Whether a command can still go out over Bluetooth with Wi-Fi down."""
+        return self._api_standby is not None
 
     @property
     def is_responding(self):
@@ -539,29 +543,6 @@ class TuyaLocalDevice(object):
             log_json(cached_state),
         )
 
-    def _switch_transport(self):
-        """Fall back to the other way of reaching this device, if there is one.
-
-        Swapping both ways means a device that came back on Wi-Fi returns to it
-        on the next failed round, so neither transport is ever stuck.
-        """
-        if self._api_standby is None:
-            return
-        # Detection belongs to the transport, not to the device: coming back to
-        # Wi-Fi must not mean walking 3.1 through 3.5 again, which takes long
-        # enough that a brief hiccup turns into minutes of swapping.
-        mine = (self._api_protocol_working, self._api_protocol_version_index)
-        self._api, self._api_standby = self._api_standby, self._api
-        self._api_protocol_working, self._api_protocol_version_index = (
-            self._standby_detect
-        )
-        self._standby_detect = mine
-        _LOGGER.warning(
-            "%s unreachable; trying it over %s instead",
-            self.name,
-            "Bluetooth" if hasattr(self._api, "_address") else "Wi-Fi",
-        )
-
     async def async_refresh(self):
         _LOGGER.debug("Refreshing device state for %s", self.name)
         if not self._running:
@@ -685,37 +666,89 @@ class TuyaLocalDevice(object):
             log_json(pending_properties),
         )
 
-        await self._retry_on_failed_connection(
+        result = await self._attempt_over_transport(
             lambda: self._set_values(pending_properties),
             "Failed to update device state.",
         )
+        if result is _UNREACHABLE and self._api_standby is not None:
+            await self._send_over_reserve(pending_properties)
 
     def _set_values(self, properties):
         try:
             self._lock.acquire()
-            self._api.set_multiple_values(properties, nowait=True)
-            now = time()
-            self._last_connection = now
-            pending_updates = self._get_pending_updates()
-            for key in properties.keys():
-                pending_updates[key]["updated_at"] = now
-                pending_updates[key]["sent"] = True
+            result = self._api.set_multiple_values(properties, nowait=True)
+            if isinstance(result, dict) and "Error" in result:
+                return result
+            self._mark_sent(properties)
         finally:
             self._lock.release()
 
-    async def _retry_on_failed_connection(self, func, error_message):
-        """Try the device, and when it has a reserve, really try that too.
+    def _mark_sent(self, properties):
+        now = time()
+        self._last_connection = now
+        pending_updates = self._get_pending_updates()
+        for key in properties.keys():
+            if key in pending_updates:
+                pending_updates[key]["updated_at"] = now
+                pending_updates[key]["sent"] = True
 
-        The swap used to land on the last attempt of a round, so the other
-        transport was selected and then thrown away unused. A device that was
-        already unreachable when Home Assistant set it up never got as far as
-        its Bluetooth reserve: setup failed, the device object went with it,
-        and the next retry started over on Wi-Fi.
+    async def _send_over_reserve(self, properties):
+        """Deliver a command over Bluetooth, then let go of the radio.
+
+        Bluetooth is only for a command sent while Wi-Fi is down. A session
+        left open keeps reconnecting on the 2.4 GHz band the Wi-Fi link needs.
         """
-        for _ in range(2 if self._api_standby is not None else 1):
-            result = await self._attempt_over_transport(func, error_message)
-            if result is not _UNREACHABLE:
-                return result
+        reserve = self._api_standby
+        _LOGGER.warning(
+            "%s is offline on Wi-Fi; sending the command over Bluetooth", self.name
+        )
+        try:
+            await self._hass.async_add_executor_job(
+                lambda: reserve.set_multiple_values(properties, nowait=True)
+            )
+        except Exception as e:
+            _LOGGER.error(
+                "%s did not answer over Bluetooth either: %s %s",
+                self.name,
+                type(e).__name__,
+                e,
+            )
+            return False
+        finally:
+            await self._release_reserve()
+
+        self._mark_sent(properties)
+        self._cached_state = self._cached_state | properties
+        self._cached_state["updated_at"] = time()
+        for entity in self._children:
+            entity.schedule_update_ha_state()
+        return True
+
+    async def async_refresh_over_reserve(self):
+        """Read the state over Bluetooth once, for a device being added."""
+        if self._api_standby is None:
+            return
+        reserve = self._api_standby
+        try:
+            state = await self._hass.async_add_executor_job(reserve.status)
+        except Exception as e:
+            _LOGGER.debug("%s Bluetooth read failed: %s %s", self.name, type(e), e)
+            return
+        finally:
+            await self._release_reserve()
+        if state and state.get("dps"):
+            self._cached_state = self._cached_state | state["dps"]
+            self._cached_state["updated_at"] = time()
+
+    async def _release_reserve(self):
+        try:
+            await self._hass.async_add_executor_job(self._api_standby.close)
+        except Exception as e:
+            _LOGGER.debug("%s Bluetooth close failed: %s %s", self.name, type(e), e)
+
+    async def _retry_on_failed_connection(self, func, error_message):
+        result = await self._attempt_over_transport(func, error_message)
+        return None if result is _UNREACHABLE else result
 
     async def _attempt_over_transport(self, func, error_message):
         """One full round of attempts over the transport currently in use."""
@@ -771,7 +804,6 @@ class TuyaLocalDevice(object):
 
                 if i + 1 == connections:
                     self._reset_cached_state()
-                    self._switch_transport()
                     self._api_working_protocol_failures += 1
                     if (
                         self._api_working_protocol_failures

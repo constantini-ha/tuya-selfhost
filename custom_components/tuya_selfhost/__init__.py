@@ -1027,7 +1027,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         cleanup_failed_device(hass, device_id)
         raise ConfigEntryNotReady("tuya-local device not ready") from e
 
-    if not device.has_returned_state:
+    if not device.has_returned_state and not device.has_reserve:
         cleanup_failed_device(hass, device_id)
         raise ConfigEntryNotReady("tuya-local device offline")
 

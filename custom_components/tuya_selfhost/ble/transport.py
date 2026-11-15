@@ -120,7 +120,11 @@ class TuyaBleTransport:
             raise ConnectionError(f"{self._address} has not advertised yet")
         manager = StoredCredentials(self._credentials(service_info))
         device = TuyaBLEDevice(manager, ble_device)
-        await device.initialize()
+        try:
+            await device.initialize()
+        except BaseException:
+            await device.stop()
+            raise
         device.register_callback(self._on_datapoints)
         _SHARED[self._address] = device
         self._device = device

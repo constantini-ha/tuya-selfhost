@@ -811,10 +811,8 @@ async def async_test_connection(config: dict, hass: HomeAssistant):
                 config,
             )
             await device.async_refresh()
-            if not device.has_returned_state and device._api_standby is not None:
-                # The first round failed over to the other transport; give that
-                # one its turn before calling the device unreachable.
-                await device.async_refresh()
+            if not device.has_returned_state:
+                await device.async_refresh_over_reserve()
             retval = device if device.has_returned_state else None
         except Exception as e:
             _LOGGER.warning("Connection test failed with %s %s", type(e), e)

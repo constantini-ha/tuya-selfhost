@@ -43,7 +43,10 @@ class TuyaLocalEntity:
 
     @property
     def available(self):
-        return self._device.has_returned_state and self._config.available(self._device)
+        if self._device.has_returned_state:
+            return self._config.available(self._device)
+        # A command is what makes the Bluetooth reserve try, so it must get through.
+        return getattr(self._device, "has_reserve", False) is True
 
     @property
     def has_entity_name(self):

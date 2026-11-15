@@ -426,15 +426,25 @@ contradicts your instinct, trust the note.
   coming back to Wi-Fi meant walking 3.1 through 3.5 again. A device that
   blinked for one poll then spent minutes swapping back and forth while being
   perfectly reachable the whole time. Each transport now keeps its own state.
-- **A reserve is only real if it is tried.** `_switch_transport` ran on the last
-  attempt of a round, so the other transport was selected and the round then
-  ended: nothing ever ran on it. Worst at setup, where a failed refresh raises
-  `ConfigEntryNotReady` and the device object is discarded, so the next retry
-  started on Wi-Fi again — the log fell to Bluetooth over and over and never
-  came back. `_retry_on_failed_connection` now runs `_attempt_over_transport`
-  once per transport. It needs a sentinel, not `None`, to tell exhaustion from
-  success: error 900 (a remote with no status to report) legitimately returns
-  `None`.
+- **Bluetooth is on demand, never in the background** (2026.11.51). The reserve
+  is used for one thing: a command sent while Wi-Fi does not answer
+  (`_send_over_reserve`), and the session is closed right after. Polling never
+  falls to Bluetooth. The old design swapped transports on any failed poll and
+  nothing closed the session afterwards, so `TuyaBLEDevice` kept reconnecting
+  for good; the host here has Wi-Fi and Bluetooth on one 2.4 GHz chip, and one
+  power strip logged 300 broken packets in 15 minutes while working fine on
+  Wi-Fi. There is no `_switch_transport` any more: `_api` is always the
+  configured transport and the reserve is called directly, so the receive loop
+  never finds itself on the other one mid-poll.
+- **An entity whose device has a reserve stays available with Wi-Fi down**
+  (`has_reserve`, state unknown). Home Assistant drops service calls to
+  unavailable entities, so the command would never reach the reserve. For the
+  same reason setup does not raise `ConfigEntryNotReady` for such a device.
+- **`_set_values` used to swallow failures.** tinytuya answers a failed
+  `nowait` command with an error dict, not an exception; the result is now
+  returned so the attempts are retried and the reserve gets its turn.
+- `TuyaBleTransport.close()` blocks on the event loop (`_run`), so call it
+  through `async_add_executor_job`, never from the loop itself.
 - When a device looks lost, prove it from outside Home Assistant before touching
   the code: listen for the UDP broadcast on 6666/6667 (AES-ECB with
   `md5(b"yGAdlopoPVldABfn")`) to see which device id is at which address, then
