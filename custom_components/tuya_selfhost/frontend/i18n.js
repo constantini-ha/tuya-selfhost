@@ -72,6 +72,7 @@ const STRINGS = {
     cloud_where:
       "In the Smart Life or Tuya app: Settings → Account and Security → User Code. It is case sensitive.",
     cloud_enter: "Sign in to Tuya",
+    cloud_open_app: "Open Smart Life",
     cloud_asking: "Asking Tuya for a code…",
     cloud_scan: "Scan this in the Smart Life app, from another phone or from a computer.",
     cloud_waiting: "Waiting for the scan — the panel notices on its own.",
@@ -384,6 +385,7 @@ const STRINGS = {
     cloud_where:
       "No app Smart Life ou Tuya: Configurações → Conta e segurança → Código de usuário. Diferencia maiúscula de minúscula.",
     cloud_enter: "Entrar na Tuya",
+    cloud_open_app: "Abrir o Smart Life",
     cloud_asking: "Pedindo o código à Tuya…",
     cloud_scan: "Escaneie no app Smart Life, de outro celular ou do computador.",
     cloud_waiting: "Esperando a leitura — o painel percebe sozinho.",
@@ -696,6 +698,7 @@ const STRINGS = {
     cloud_where:
       "En la app Smart Life o Tuya: Configuración → Cuenta y seguridad → Código de usuario. Distingue mayúsculas de minúsculas.",
     cloud_enter: "Entrar en Tuya",
+    cloud_open_app: "Abrir Smart Life",
     cloud_asking: "Pidiéndole el código a Tuya…",
     cloud_scan: "Escanéalo en la app Smart Life, desde otro móvil o desde el ordenador.",
     cloud_waiting: "Esperando el escaneo — el panel se entera solo.",

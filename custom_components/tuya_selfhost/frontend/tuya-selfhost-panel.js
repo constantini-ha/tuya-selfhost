@@ -1253,6 +1253,15 @@ class TuyaSelfhostPanel extends HTMLElement {
       "beforeend",
       `<div class="muted" style="margin-top:8px">${this._t("cloud_where")}</div>`
     );
+    // The user code lives in the app, and only a phone can have it installed.
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      const open = document.createElement("a");
+      open.className = "link";
+      open.href = "smartlife://";
+      open.style.cssText = "display:inline-block;margin-top:10px;padding:6px 0";
+      open.textContent = this._t("cloud_open_app");
+      box.appendChild(open);
+    }
     return box;
   }
 
