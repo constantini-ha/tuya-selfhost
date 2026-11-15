@@ -259,8 +259,11 @@ class Cloud:
             "online": device.online,
             "support_local": device.support_local,
             "has_local_key": bool(getattr(device, "local_key", "")),
+            # Raw values carry offline passwords and keys under harmless names.
             "status": {
-                code: "<hidden>" if any(w in code for w in secret) else value
+                code: "<hidden>"
+                if any(w in code for w in secret) or isinstance(value, str)
+                else value
                 for code, value in (device.status or {}).items()
             },
             "function": {
