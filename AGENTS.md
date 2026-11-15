@@ -470,9 +470,13 @@ contradicts your instinct, trust the note.
   device owns (its stored reserve, or Wi-Fi MAC plus one from the ARP table). A
   stored reserve that is not heard is listed as out of reach.
 
-- The sign-in block shows an "Open Smart Life" link (`smartlife://`) on phones
-  only, by user agent. The scheme is undocumented; it was confirmed by hand on
-  the owner's iPhone (Safari asks to open the app). It opens the app's home, not
+- The sign-in block shows "Open Smart Life" (`smartlife://`) and "Open Tuya"
+  (`tuyasmart://`) links on phones only, by user agent. A web page cannot tell
+  which app is installed, so both are offered. The schemes are undocumented:
+  `smartlife://` was confirmed by hand on the owner's iPhone (Safari asks to
+  open the app), `tuyasmart://` was never tested.
+- The owner finds this screen self-explanatory: headings, field and buttons,
+  with one short line for the path to the user code. Do not add paragraphs. It opens the app's home, not
   the User Code screen, and nothing found replaces the QR scan with a link.
 
 - The last user code Tuya accepted is kept in its own store

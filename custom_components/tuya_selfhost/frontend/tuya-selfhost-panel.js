@@ -1255,12 +1255,21 @@ class TuyaSelfhostPanel extends HTMLElement {
     );
     // The user code lives in the app, and only a phone can have it installed.
     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-      const open = document.createElement("a");
-      open.className = "link";
-      open.href = "smartlife://";
-      open.style.cssText = "display:inline-block;margin-top:10px;padding:6px 0";
-      open.textContent = this._t("cloud_open_app");
-      box.appendChild(open);
+      // A page cannot ask which app is installed, so both are offered.
+      const apps = document.createElement("div");
+      apps.style.cssText = "display:flex;gap:20px;margin-top:10px";
+      for (const [scheme, label] of [
+        ["smartlife://", "cloud_open_smartlife"],
+        ["tuyasmart://", "cloud_open_tuya"],
+      ]) {
+        const open = document.createElement("a");
+        open.className = "link";
+        open.href = scheme;
+        open.style.padding = "6px 0";
+        open.textContent = this._t(label);
+        apps.appendChild(open);
+      }
+      box.appendChild(apps);
     }
     return box;
   }
@@ -1573,16 +1582,9 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   _tabAdd() {
     const box = document.createElement("div");
-    const intro = document.createElement("div");
-    intro.className = "block";
-    intro.innerHTML = `<div class="muted">${this._t("add_intro")}</div>`;
-    box.appendChild(intro);
-
     const cloud = document.createElement("div");
     cloud.className = "block";
-    cloud.innerHTML = `<h3>${this._t("add_cloud")}</h3>
-      <div class="muted">${this._t("add_cloud_text")}</div>`;
-    // The heading above already says what the account is for.
+    cloud.innerHTML = `<h3>${this._t("add_cloud")}</h3>`;
     const signIn = this._loginBox(false);
     signIn.style.marginTop = "12px";
     cloud.appendChild(signIn);
@@ -1590,8 +1592,7 @@ class TuyaSelfhostPanel extends HTMLElement {
 
     const manual = document.createElement("div");
     manual.className = "block";
-    manual.innerHTML = `<h3>${this._t("add_local")}</h3>
-      <div class="muted">${this._t("add_local_text")}</div>`;
+    manual.innerHTML = `<h3>${this._t("add_local")}</h3>`;
     const go = document.createElement("button");
     go.className = "act";
     go.style.marginTop = "12px";
