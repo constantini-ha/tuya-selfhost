@@ -12,6 +12,7 @@ import segno
 import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 
 from .cloud import Cloud
 from .const import DOMAIN, TUYA_RESPONSE_MSG
@@ -20,10 +21,17 @@ _LOGGER = logging.getLogger(__name__)
 
 LOGIN_KEY = "cloud_login"
 QR_PREFIX = "tuyaSmart--qrLogin?token="
+LAST_CODE_KEY = "last_user_code"
+LAST_CODE_STORE_KEY = "tuya_selfhost_last_user_code"
 
 
 async def async_setup_cloud_api(hass: HomeAssistant) -> None:
     """Register the sign-in commands the panel calls."""
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if "last_code_store" not in domain_data:
+        store = Store(hass, 1, LAST_CODE_STORE_KEY)
+        domain_data["last_code_store"] = store
+        domain_data[LAST_CODE_KEY] = (await store.async_load() or {}).get("user_code", "")
     websocket_api.async_register_command(hass, websocket_cloud_status)
     websocket_api.async_register_command(hass, websocket_cloud_qr)
     websocket_api.async_register_command(hass, websocket_cloud_login)
@@ -33,6 +41,16 @@ async def async_setup_cloud_api(hass: HomeAssistant) -> None:
 def _login_state(hass: HomeAssistant) -> dict[str, Any]:
     """A sign-in in progress: the code lives on a Cloud, which has to outlive a call."""
     return hass.data.setdefault(DOMAIN, {}).setdefault(LOGIN_KEY, {})
+
+
+def _remember_code(hass: HomeAssistant, user_code: str) -> None:
+    """Keep the last code Tuya accepted, to offer it again after a sign-out."""
+    if not user_code:
+        return
+    hass.data[DOMAIN][LAST_CODE_KEY] = user_code
+    hass.data[DOMAIN]["last_code_store"].async_delay_save(
+        lambda: {"user_code": hass.data[DOMAIN].get(LAST_CODE_KEY, "")}, 1
+    )
 
 
 def _qr_rows(data: str) -> list[str]:
@@ -48,7 +66,11 @@ def websocket_cloud_status(hass, connection, msg) -> None:
     cached = (hass.data.get(DOMAIN) or {}).get("auth_cache") or {}
     connection.send_result(
         msg["id"],
-        {"authenticated": bool(cached), "user_code": cached.get("user_code", "")},
+        {
+            "authenticated": bool(cached),
+            "user_code": cached.get("user_code")
+            or (hass.data.get(DOMAIN) or {}).get(LAST_CODE_KEY, ""),
+        },
     )
 
 
@@ -64,7 +86,8 @@ async def websocket_cloud_qr(hass, connection, msg) -> None:
     """Ask Tuya for a sign-in code and hand back the square to scan."""
     state = _login_state(hass)
     cloud = Cloud(hass)
-    token = await cloud.async_get_qr_code(msg["user_code"].strip())
+    user_code = msg["user_code"].strip()
+    token = await cloud.async_get_qr_code(user_code)
     if not token:
         state.clear()
         error = cloud.last_error or {}
@@ -74,6 +97,7 @@ async def websocket_cloud_qr(hass, connection, msg) -> None:
         return
     state["cloud"] = cloud
     state["token"] = token
+    _remember_code(hass, user_code)
     connection.send_result(msg["id"], {"rows": _qr_rows(QR_PREFIX + token)})
 
 
@@ -104,5 +128,7 @@ async def websocket_cloud_login(hass, connection, msg) -> None:
 async def websocket_cloud_logout(hass, connection, msg) -> None:
     """Forget the account."""
     _login_state(hass).clear()
+    cached = (hass.data.get(DOMAIN) or {}).get("auth_cache") or {}
+    _remember_code(hass, cached.get("user_code", ""))
     Cloud(hass).logout()
     connection.send_result(msg["id"], {"ok": True})

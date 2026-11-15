@@ -475,6 +475,11 @@ contradicts your instinct, trust the note.
   the owner's iPhone (Safari asks to open the app). It opens the app's home, not
   the User Code screen, and nothing found replaces the QR scan with a link.
 
+- The last user code Tuya accepted is kept in its own store
+  (`tuya_selfhost_last_user_code`), apart from `auth_cache`, which sign-out
+  wipes. `cloud/status` answers it when nobody is signed in, so the field comes
+  prefilled on any device.
+
 ### Releasing
 
 - This checkout has two remotes, and `gh` resolves to the **upstream**

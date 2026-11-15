@@ -1135,8 +1135,8 @@ class TuyaSelfhostPanel extends HTMLElement {
         result = {};
       }
       if (result.ok) {
+        this._cloud = { authenticated: true, user_code: this._login.user_code };
         this._login = null;
-        this._cloud = { authenticated: true };
         this._flash = this._t("cloud_done");
         this._render();
         return;
@@ -1159,8 +1159,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     } catch (err) {
       /* the account is gone either way as far as this panel is concerned */
     }
-    this._cloud = { authenticated: false };
     this._login = null;
+    await this._cloudStatus();
     this._render();
   }
 
