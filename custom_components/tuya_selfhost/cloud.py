@@ -238,6 +238,15 @@ class Cloud:
 
         return cloud_devices
 
+    async def async_ble_credentials(self, device_id: str) -> tuple[str, str] | None:
+        """The uuid a device broadcasts and its key, for code that stays on the server."""
+        manager = self._manager()
+        await self.__hass.async_add_executor_job(manager.update_device_cache)
+        device = manager.device_map.get(device_id)
+        if device is None:
+            return None
+        return device.uuid, getattr(device, "local_key", "") or ""
+
     async def async_inspect(self, device_id: str) -> dict[str, Any] | None:
         """What Tuya knows about one device, without its key or secrets."""
         manager = self._manager()

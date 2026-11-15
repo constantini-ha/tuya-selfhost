@@ -37,6 +37,7 @@ async def async_setup_cloud_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_cloud_login)
     websocket_api.async_register_command(hass, websocket_cloud_logout)
     websocket_api.async_register_command(hass, websocket_cloud_inspect)
+    websocket_api.async_register_command(hass, websocket_cloud_ble_probe)
 
 
 def _login_state(hass: HomeAssistant) -> dict[str, Any]:
@@ -150,3 +151,68 @@ async def websocket_cloud_inspect(hass, connection, msg) -> None:
         connection.send_result(msg["id"], {"error": f"{type(e).__name__}: {e}"})
         return
     connection.send_result(msg["id"], found or {"error": "not_found"})
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/cloud/ble_probe",
+        vol.Required("device_id"): str,
+        vol.Optional("read", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def websocket_cloud_ble_probe(hass, connection, msg) -> None:
+    """Is an account device within Bluetooth reach, and does it answer a status read?
+
+    Read only: nothing is ever written to the device from here.
+    """
+    from homeassistant.components import bluetooth
+
+    from .ble.discovery import SERVICE_UUID, uuid_from_advertisement
+    from .ble.transport import TuyaBleTransport
+
+    if not (hass.data.get(DOMAIN) or {}).get("auth_cache"):
+        connection.send_result(msg["id"], {"error": "signed_out"})
+        return
+    found = await Cloud(hass).async_ble_credentials(msg["device_id"])
+    if not found:
+        connection.send_result(msg["id"], {"error": "not_found"})
+        return
+    uuid, local_key = found
+
+    heard = []
+    match = None
+    for info in bluetooth.async_discovered_service_info(hass, connectable=False):
+        payload = (info.service_data or {}).get(SERVICE_UUID)
+        if not payload:
+            continue
+        broadcast = uuid_from_advertisement(info)
+        row = {
+            "address": info.address.upper(),
+            "rssi": info.rssi,
+            "connectable": info.connectable,
+            "product": payload[1:].decode("ascii", "replace"),
+            "is_it": broadcast == uuid,
+        }
+        heard.append(row)
+        if broadcast == uuid:
+            match = row
+    result: dict[str, Any] = {"heard": heard, "match": match}
+
+    if match and msg["read"]:
+        transport = TuyaBleTransport(hass, match["address"], msg["device_id"], local_key)
+        try:
+            state = await hass.async_add_executor_job(transport.status)
+            result["read"] = {
+                code: "<hidden>" if isinstance(value, (str, bytes)) else value
+                for code, value in (state.get("dps") or {}).items()
+            }
+        except Exception as e:
+            result["read_error"] = f"{type(e).__name__}: {e}"
+        finally:
+            try:
+                await hass.async_add_executor_job(transport.close)
+            except Exception as e:
+                _LOGGER.debug("Bluetooth close failed: %s %s", type(e).__name__, e)
+    connection.send_result(msg["id"], result)
