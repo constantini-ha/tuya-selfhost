@@ -238,6 +238,50 @@ class Cloud:
 
         return cloud_devices
 
+    async def async_inspect(self, device_id: str) -> dict[str, Any] | None:
+        """What Tuya knows about one device, without its key or secrets."""
+        manager = self._manager()
+        await self.__hass.async_add_executor_job(manager.update_device_cache)
+        device = manager.device_map.get(device_id)
+        if device is None:
+            return None
+        response = await self.__hass.async_add_executor_job(
+            manager.customer_api.get,
+            f"/v1.0/m/life/devices/{device_id}/status",
+        )
+        result = (response or {}).get("result") or {}
+        secret = ("password", "key", "token", "secret")
+        return {
+            "name": device.name,
+            "category": device.category,
+            "product_id": device.product_id,
+            "product_name": device.product_name,
+            "online": device.online,
+            "support_local": device.support_local,
+            "has_local_key": bool(getattr(device, "local_key", "")),
+            "status": {
+                code: "<hidden>" if any(w in code for w in secret) else value
+                for code, value in (device.status or {}).items()
+            },
+            "function": {
+                code: {"type": f.type, "values": f.values}
+                for code, f in (device.function or {}).items()
+            },
+            "status_range": {
+                code: {"type": r.type, "values": r.values}
+                for code, r in (device.status_range or {}).items()
+            },
+            "datapoints": [
+                {
+                    "id": entry.get("dpId"),
+                    "code": entry.get("dpCode"),
+                    "type": entry.get("valueType"),
+                    "local": entry.get("supportLocal"),
+                }
+                for entry in result.get("dpStatusRelationDTOS") or []
+            ],
+        }
+
     async def async_get_datamodel(self, device_id) -> dict[str, Any] | None:
         """Get the data model for the specified device (QueryThingsDataModel)."""
         manager = self._manager()

@@ -36,6 +36,7 @@ async def async_setup_cloud_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_cloud_qr)
     websocket_api.async_register_command(hass, websocket_cloud_login)
     websocket_api.async_register_command(hass, websocket_cloud_logout)
+    websocket_api.async_register_command(hass, websocket_cloud_inspect)
 
 
 def _login_state(hass: HomeAssistant) -> dict[str, Any]:
@@ -128,3 +129,24 @@ async def websocket_cloud_logout(hass, connection, msg) -> None:
     _login_state(hass).clear()
     Cloud(hass).logout()
     connection.send_result(msg["id"], {"ok": True})
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/cloud/inspect",
+        vol.Required("device_id"): str,
+    }
+)
+@websocket_api.async_response
+async def websocket_cloud_inspect(hass, connection, msg) -> None:
+    """Describe one device of the account, to tell what it would take to support it."""
+    if not (hass.data.get(DOMAIN) or {}).get("auth_cache"):
+        connection.send_result(msg["id"], {"error": "signed_out"})
+        return
+    try:
+        found = await Cloud(hass).async_inspect(msg["device_id"])
+    except Exception as e:
+        connection.send_result(msg["id"], {"error": f"{type(e).__name__}: {e}"})
+        return
+    connection.send_result(msg["id"], found or {"error": "not_found"})
