@@ -556,3 +556,7 @@ contradicts your instinct, trust the note.
   under 9 s produce flaky, meaningless failures.
 - Clean up anything a test creates: these runs go against the user's live
   installation.
+- The device card rebuilds its whole DOM on every state change, so its animations (body
+  unfolding, tiles rising, the pop and ring when a key flips) carry a start time and are
+  resumed with a negative `animation-delay` (`--e`) on the next render. To try a flip
+  without touching a device, hand the card a copy of `hass` with one state changed.

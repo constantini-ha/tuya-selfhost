@@ -55,7 +55,30 @@ const STYLE = `
   .gang .st { font-size:.64em; color:var(--secondary-text-color) }
   ${OUTLET_CSS}
   .gang.off .lbl, .gang.off .st { opacity:.55 }
+  .tile, .gang .dot { position:relative }
+  .rise { animation:tsh-rise .36s cubic-bezier(.2,.8,.2,1) backwards;
+    animation-delay:calc(var(--i, 0) * 45ms + 70ms + var(--e, 0ms)) }
+  .chev.turn { animation:tsh-turn .28s cubic-bezier(.2,.8,.2,1) backwards; animation-delay:var(--e, 0ms) }
+  .lit { animation:tsh-pop .42s cubic-bezier(.3,1.6,.5,1) backwards; animation-delay:var(--e, 0ms) }
+  .lit::after { content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    border:2px solid var(--ring, var(--primary-color)); opacity:0;
+    animation:tsh-ring .6s ease-out backwards; animation-delay:var(--e, 0ms) }
+  .dim { animation:tsh-dip .3s ease-out backwards; animation-delay:var(--e, 0ms) }
+  @keyframes tsh-rise { from { opacity:0; transform:translateY(12px) scale(.92) } }
+  @keyframes tsh-turn { from { transform:rotate(0) } }
+  @keyframes tsh-pop { from { transform:scale(.9) } }
+  @keyframes tsh-ring { from { opacity:.75; transform:scale(1) } to { opacity:0; transform:scale(1.24) } }
+  @keyframes tsh-dip { 50% { transform:scale(.94) } }
+  @media (prefers-reduced-motion: reduce) {
+    .rise, .lit, .dim, .chev.turn { animation:none }
+    .lit::after { display:none }
+  }
 `;
+
+const OPEN_MS = 300;
+const CLOSE_MS = 220;
+const FLIP_MS = 600;
+const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // One colour per key, like the vendor app, so a six gang switch is readable at a glance.
 const CORES = ["#3B9EFF", "#34C759", "#FF8A3D", "#FFCC33", "#C77DFF", "#FF5D8F"];
@@ -191,8 +214,69 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
       : t(this._hass, "some_on", { n: on, total: states.length });
   }
 
+  // The card is rebuilt on every state change, so a running animation is resumed where it was.
+  _flips() {
+    const now = performance.now();
+    const seen = {};
+    this._flipped = this._flipped || {};
+    for (const id of this._gangs || []) {
+      const state = (this._hass.states[id] || {}).state;
+      const before = this._seen && this._seen[id];
+      seen[id] = state;
+      if (before && before !== state && (state === "on" || state === "off") && before !== "unavailable") {
+        this._flipped[id] = { on: state === "on", at: now };
+      }
+    }
+    this._seen = seen;
+    return (el, id) => {
+      const flip = this._flipped[id];
+      if (!flip || now - flip.at > FLIP_MS) return;
+      el.classList.add(flip.on ? "lit" : "dim");
+      el.style.setProperty("--e", `${Math.round(flip.at - now)}ms`);
+    };
+  }
+
+  _toggle() {
+    if (this._closing) return;
+    if (!this._expanded) {
+      this._expanded = true;
+      this._opened = performance.now();
+      this._render();
+      const body = this.querySelector(".body");
+      if (body && body.animate && !still()) {
+        body.style.overflow = "hidden";
+        const grow = body.animate(
+          [{ height: "0px", opacity: 0 }, { height: `${body.offsetHeight}px`, opacity: 1 }],
+          { duration: OPEN_MS, easing: "cubic-bezier(.2,.8,.2,1)" }
+        );
+        grow.onfinish = () => { body.style.overflow = ""; };
+      }
+      return;
+    }
+    const body = this.querySelector(".body");
+    const close = () => {
+      this._closing = false;
+      this._expanded = false;
+      this._render();
+    };
+    if (!body || !body.animate || still()) return close();
+    this._closing = true;
+    body.style.overflow = "hidden";
+    body.animate(
+      [{ height: `${body.offsetHeight}px`, opacity: 1 }, { height: "0px", opacity: 0 }],
+      { duration: CLOSE_MS, easing: "cubic-bezier(.4,0,.6,1)", fill: "forwards" }
+    );
+    const chev = this.querySelector(".chev");
+    if (chev) chev.classList.remove("open");
+    setTimeout(close, CLOSE_MS);
+  }
+
   _render() {
     this._shown = this._signature();
+    const flip = this._flips();
+    const sinceOpen = performance.now() - (this._opened || -1e9);
+    const opening = sinceOpen < OPEN_MS + 400;
+    const elapsed = `${-Math.round(sinceOpen)}ms`;
     const card = document.createElement("ha-card");
 
     if (this._error) {
@@ -234,12 +318,13 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
       quick.append(geral);
       const chev = document.createElement("ha-icon");
       chev.setAttribute("icon", "mdi:chevron-down");
-      chev.className = this._expanded ? "chev open" : "chev";
+      chev.className = this._expanded && !this._closing ? "chev open" : "chev";
+      if (this._expanded && opening) {
+        chev.classList.add("turn");
+        chev.style.setProperty("--e", elapsed);
+      }
       head.append(quick, chev);
-      head.addEventListener("click", () => {
-        this._expanded = !this._expanded;
-        this._render();
-      });
+      head.addEventListener("click", () => this._toggle());
       card.appendChild(head);
 
       const names = this._names();
@@ -262,6 +347,8 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
             <span class="st">${on ? t(this._hass, "on") : st && st.state === "unavailable" ? "—" : t(this._hass, "off")}</span>`;
           const dot = b.querySelector(".dot");
           dot.style.color = cor;
+          dot.style.setProperty("--ring", cor);
+          flip(dot, id);
           dot.style.opacity = on ? "1" : "0.42";
           dot.style.background = on
             ? `color-mix(in srgb, ${cor} 24%, transparent)`
@@ -306,6 +393,12 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
         tile.addEventListener("click", () =>
           this._hass.callService("homeassistant", "toggle", { entity_id: id })
         );
+        flip(tile, id);
+        if (opening) {
+          wrap.classList.add("rise");
+          wrap.style.setProperty("--i", grid.children.length);
+          wrap.style.setProperty("--e", elapsed);
+        }
         const name = document.createElement("div");
         name.className = "tilename";
         name.textContent = names[id];
@@ -335,6 +428,11 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
           window.dispatchEvent(new CustomEvent("location-changed"));
         })
       );
+      if (opening) {
+        actions.classList.add("rise");
+        actions.style.setProperty("--i", Math.min(grid.children.length, 6));
+        actions.style.setProperty("--e", elapsed);
+      }
       body.appendChild(actions);
     }
 
