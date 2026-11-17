@@ -560,3 +560,17 @@ contradicts your instinct, trust the note.
   unfolding, tiles rising, the pop and ring when a key flips) carry a start time and are
   resumed with a negative `animation-delay` (`--e`) on the next render. To try a flip
   without touching a device, hand the card a copy of `hass` with one state changed.
+- Some relays (the garage one, product `keyjnuy4s3kre7m7` on `relay_switch_remote`) leave
+  dp 1 out of a status reply, so after a restart the switch stayed unknown until someone
+  pressed it. dp 1 there is `force: true`: the receive loop alternates `updatedps([1])` with
+  `status()`. That is a read, nothing is switched.
+- Home Assistant 2026.11 deprecates, for removal in 2027.5 / 2027.8: `CONN_CLASS_LOCAL_PUSH`
+  (gone from the config flow), `CONCENTRATION_MICROGRAMS_PER_CUBIC_METER` (now
+  `UnitOfDensity.MICROGRAMS_PER_CUBIC_METER`), `DeviceInfo(via_device=…)` (now
+  `via_device_id`, the registry id of the parent) and `async_get_device(identifiers=…)` (now
+  `async_get_device_by_identifier(identifier, entry_id)`, since identifiers are only unique
+  within a config entry). The 2026.11.0 source of `helpers/device_registry.py` lists them in
+  `_DEPRECATED_DEVICE_INFO_PARAMETERS`.
+- The log line "device product id … is not listed in its config" comes from discovery every
+  few minutes. `key5ckdnys3pqgec` is shared by a 1-gang (Varanda) and 2-gang switches, so it
+  cannot be listed in one config without breaking the other match; those lines are expected.
