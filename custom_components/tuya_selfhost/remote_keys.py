@@ -12,6 +12,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -275,10 +276,13 @@ def _control_device(entry: ConfigEntry, emitter, control) -> DeviceInfo:
     entity's name with its device's, and "<blaster> <remote> <key>" is not
     something anyone can say out loud.
     """
+    parent = dr.async_get(emitter._hass).async_get_device(
+        identifiers=emitter.device_info["identifiers"]
+    )
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry.entry_id}:{control['id']}")},
         name=control["name"],
         manufacturer="Tuya Selfhost",
         model=MODEL,
-        via_device=next(iter(emitter.device_info["identifiers"])),
+        **({"via_device_id": parent.id} if parent else {}),
     )

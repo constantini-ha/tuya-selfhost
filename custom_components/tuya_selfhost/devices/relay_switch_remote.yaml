@@ -4,12 +4,15 @@ products:
     model: "1-433"
   - id: fugkn1vkc53nvo1s
     model: "1 Gang WiFi Smart Relay"
+  - id: keyjnuy4s3kre7m7
 entities:
   - entity: switch
     dps:
       - id: 1
         type: boolean
         name: switch
+        # Some leave it out of a status reply, so after a restart the relay showed unknown.
+        force: true
       - id: 49
         name: add_remote
         type: string

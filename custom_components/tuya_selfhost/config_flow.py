@@ -6,7 +6,6 @@ from typing import Any
 import tinytuya
 import voluptuous as vol
 from homeassistant.config_entries import (
-    CONN_CLASS_LOCAL_PUSH,
     ConfigEntry,
     ConfigFlow,
     OptionsFlow,
@@ -99,7 +98,6 @@ async def _async_migrate_identity(
 class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     VERSION = 13
     MINOR_VERSION = 21
-    CONNECTION_CLASS = CONN_CLASS_LOCAL_PUSH
     device = None
     data = {}
 
