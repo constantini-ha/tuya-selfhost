@@ -73,7 +73,7 @@ async def _async_migrate_identity(
             )
 
     dev_reg = dr.async_get(hass)
-    device = dev_reg.async_get_device(identifiers={(DOMAIN, old_uid)})
+    device = dev_reg.async_get_device_by_identifier((DOMAIN, old_uid), entry.entry_id)
     if device:
         dev_reg.async_update_device(device.id, new_identifiers={(DOMAIN, new_uid)})
 

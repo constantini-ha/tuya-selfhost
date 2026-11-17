@@ -65,7 +65,7 @@ def _async_get_diagnostics(
     # integration does not publish anything to it other than some hardcoded
     # values that don't change between devices. Instead get the live data
     # from the running hass.
-    data |= _async_device_as_dict(hass, hass_data["device"])
+    data |= _async_device_as_dict(hass, hass_data["device"], entry.entry_id)
 
     return data
 
@@ -96,7 +96,7 @@ def redact_entity(
 
 @callback
 def _async_device_as_dict(
-    hass: HomeAssistant, device: TuyaLocalDevice
+    hass: HomeAssistant, device: TuyaLocalDevice, entry_id: str
 ) -> dict[str, Any]:
     """Represent a Tuya Local device as a dictionary."""
 
@@ -119,8 +119,8 @@ def _async_device_as_dict(
 
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
-    hass_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, device.unique_id)}
+    hass_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, device.unique_id), entry_id
     )
     if hass_device:
         data["home_assistant"] = {

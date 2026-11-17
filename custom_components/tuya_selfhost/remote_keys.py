@@ -276,8 +276,8 @@ def _control_device(entry: ConfigEntry, emitter, control) -> DeviceInfo:
     entity's name with its device's, and "<blaster> <remote> <key>" is not
     something anyone can say out loud.
     """
-    parent = dr.async_get(emitter._hass).async_get_device(
-        identifiers=emitter.device_info["identifiers"]
+    parent = dr.async_get(emitter._hass).async_get_device_by_identifier(
+        next(iter(emitter.device_info["identifiers"])), entry.entry_id
     )
     return DeviceInfo(
         identifiers={(DOMAIN, f"{entry.entry_id}:{control['id']}")},
