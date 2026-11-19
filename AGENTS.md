@@ -595,3 +595,11 @@ contradicts your instinct, trust the note.
   read again, and skips the redraw while an automation, a scene or a name is being edited.
   `connectedCallback` does the same when the panel comes back, since `_boot` only runs once:
   before this a new device needed a page reload to show in the list and in the network tab.
+- Names given to each key in Smart Life do not reach Home Assistant: the QR sign-in only
+  opens Tuya's whitelisted `/v1.0/m/life/ha/...` paths (others answer 1108 "uri path
+  invalid", `/v1.0/devices/{id}/multiple-names` answers 2008), and the device object has no
+  name per key (fields checked on the fence relay, 11/2026). Names are typed once here.
+- Key kinds (`OUTLET_KINDS`) now also come from the key's own name when nobody chose one
+  (`words`, pt/en/es): fence, siren, zone, pump and light. `keyOwnName` strips the device
+  name from the friendly name, or every key of "Eletrificador de cerca" would be a fence.
+  The device list icon comes from the device name first, then sockets (`plug` kinds).

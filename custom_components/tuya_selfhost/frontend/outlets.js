@@ -63,14 +63,37 @@ const SOCKET_ICONS = {
   fr: "mdi:power-socket-fr", de: "mdi:power-socket-de", eu: "mdi:power-socket-eu",
 };
 
+// `words` let a key named in the vendor app or here pick its kind on its own (pt, en, es).
 export const OUTLET_KINDS = [
   { id: "key", label: "kind_key" },
-  { id: "outlet", label: "kind_outlet", socket: true },
-  { id: "usb", label: "kind_usb", svg: USB_A },
-  { id: "usbmix", label: "kind_usbmix", svg: USB_BANK, box: "0 0 24 24.6", tall: true },
-  { id: "usbc", label: "kind_usbc", svg: USB_C },
-  { id: "light", label: "kind_light", icon: "mdi:lightbulb" },
+  { id: "outlet", label: "kind_outlet", socket: true, plug: true },
+  { id: "usb", label: "kind_usb", svg: USB_A, plug: true },
+  { id: "usbmix", label: "kind_usbmix", svg: USB_BANK, box: "0 0 24 24.6", tall: true, plug: true },
+  { id: "usbc", label: "kind_usbc", svg: USB_C, plug: true },
+  { id: "fence", label: "kind_fence", icon: "mdi:fence-electric", words: /cerca|eletrifica|electrifi|fence/i },
+  { id: "siren", label: "kind_siren", icon: "mdi:alarm-light", words: /siren|alarm/i },
+  { id: "zone", label: "kind_zone", icon: "mdi:shield-home", words: /\b(setor|zona|sector|zone)\b/i },
+  { id: "pump", label: "kind_pump", icon: "mdi:water-pump", words: /bomba|pump/i },
+  {
+    id: "light", label: "kind_light", icon: "mdi:lightbulb",
+    words: /\b(luz|luzes|l[aâ]mpada|abajur|lustre|lumin[aá]ria|light|lamp|l[aá]mpara)\b/i,
+  },
 ];
+
+export function kindByName(name) {
+  return (name && OUTLET_KINDS.find((kind) => kind.words && kind.words.test(name))) || null;
+}
+
+// A key's own name: the friendly name without the device's name in front of it.
+export function keyOwnName(hass, entityId) {
+  const state = hass.states[entityId];
+  const full = (state && state.attributes.friendly_name) || "";
+  const entry = (hass.entities || {})[entityId];
+  const device = entry && (hass.devices || {})[entry.device_id];
+  const prefix = device && (device.name_by_user || device.name);
+  const own = prefix && full.startsWith(prefix) ? full.slice(prefix.length).trim() : full;
+  return own || full;
+}
 
 export const OUTLET_CSS = `
 .face { width:30px; height:30px; --mdc-icon-size:30px; flex:none }
@@ -94,11 +117,13 @@ export async function saveOutletKinds(hass, kinds) {
   await hass.callWS({ type: LAYOUT_SET, key: OUTLETS_KEY, layout: { kinds } });
 }
 
-export function outletKind(kinds, entityId, deviceClass) {
+export function outletKind(kinds, entityId, deviceClass, name) {
   const chosen = (kinds || {})[entityId];
   if (chosen) return chosen;
-  // A socket says so itself; a key on the wall says nothing and stays a rocker.
-  return deviceClass === "outlet" ? "outlet" : "key";
+  // A socket says so itself; a key on the wall says nothing unless its name does.
+  if (deviceClass === "outlet") return "outlet";
+  const named = kindByName(name);
+  return named ? named.id : "key";
 }
 
 function socketOf(hass) {
@@ -128,7 +153,7 @@ export function kindGlyph(hass, kind, fallback) {
 }
 
 export function outletGlyph(hass, kinds, entityId, deviceClass, fallback) {
-  const id = outletKind(kinds, entityId, deviceClass);
+  const id = outletKind(kinds, entityId, deviceClass, keyOwnName(hass, entityId));
   return kindGlyph(hass, OUTLET_KINDS.find((k) => k.id === id), fallback);
 }
 
@@ -140,7 +165,7 @@ export function outletGlyph(hass, kinds, entityId, deviceClass, fallback) {
  * keys: [{entity_id, named, fallback, deviceClass}], label: (key) => string
  */
 export function outletNames(keys, kinds, label) {
-  const of = (key) => outletKind(kinds, key.entity_id, key.deviceClass);
+  const of = (key) => outletKind(kinds, key.entity_id, key.deviceClass, key.fallback);
   const names = {};
   for (const key of keys) {
     const kind = of(key);

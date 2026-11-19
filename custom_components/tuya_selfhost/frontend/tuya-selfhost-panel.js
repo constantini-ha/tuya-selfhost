@@ -1,5 +1,5 @@
 import { t } from "./i18n.js";
-import { OUTLET_CSS, OUTLET_KINDS, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
+import { OUTLET_CSS, OUTLET_KINDS, keyOwnName, kindByName, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
   outletNames, saveOutletKinds } from "./outlets.js";
 
 import { SCENE_CSS, SceneMethods } from "./scenes.js";
@@ -456,13 +456,16 @@ class TuyaSelfhostPanel extends HTMLElement {
     return null;
   }
 
-  // The row wears what the device is: a socket only when its keys are sockets.
+  // The row wears what the device is: its name first (a fence, a pump), a socket only
+  // when its keys are sockets.
   _deviceGlyph(entry) {
+    const named = kindByName(entry.title);
+    if (named) return `<ha-icon icon="${named.icon}"></ha-icon>`;
     const plugs = this._gangsOf(entry).some((item) => {
       const state = this._hass.states[item.entity_id];
       const kind = outletKind(this._kinds, item.entity_id,
         state && state.attributes.device_class);
-      return kind !== "key" && kind !== "light";
+      return (OUTLET_KINDS.find((k) => k.id === kind) || {}).plug;
     });
     return plugs
       ? kindGlyph(this._hass, OUTLET_KINDS.find((k) => k.socket))
@@ -570,7 +573,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       picker.className = "icons";
       const state = this._hass.states[item.entity_id];
       const current = outletKind(this._kinds, item.entity_id,
-        state && state.attributes.device_class);
+        state && state.attributes.device_class, keyOwnName(this._hass, item.entity_id));
       for (const kind of OUTLET_KINDS) {
         const pick = document.createElement("button");
         pick.className = "iconpick";
