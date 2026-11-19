@@ -304,6 +304,73 @@ class TuyaSelfhostPanel extends HTMLElement {
     await this._cloudStatus();
     this._render();
     this._watch();
+    this._watchEntries();
+  }
+
+  // A device added or removed anywhere (this tab, the form, another screen) shows up here.
+  async _watchEntries() {
+    if (this._unentries) return;
+    const later = () => {
+      clearTimeout(this._entriesTimer);
+      this._entriesTimer = setTimeout(() => this._refreshEntries(), 1500);
+    };
+    try {
+      const conn = this._hass.connection;
+      const offEntries = await conn.subscribeMessage(
+        (changes) => {
+          if ((changes || []).some((c) => c.type && c.entry && c.entry.domain === "tuya_selfhost")) later();
+        },
+        { type: "config_entries/subscribe" }
+      );
+      const offRegistry = await conn.subscribeEvents((event) => {
+        if (["create", "remove"].includes(event.data && event.data.action)) later();
+      }, "entity_registry_updated");
+      this._unentries = () => {
+        offEntries();
+        offRegistry();
+      };
+    } catch (err) {
+      this._unentries = null;
+    }
+  }
+
+  async _refreshEntries() {
+    let entries;
+    let registry;
+    try {
+      [entries, registry] = await Promise.all([
+        this._hass.callWS({ type: "config_entries/get", domain: "tuya_selfhost" }),
+        this._hass.callWS({ type: "config/entity_registry/list" }),
+      ]);
+    } catch (err) {
+      return;
+    }
+    this._entries = entries || [];
+    this._byEntry = {};
+    for (const item of registry) {
+      if (item.platform !== "tuya_selfhost" || !item.config_entry_id) continue;
+      if (item.disabled_by || item.hidden_by) continue;
+      (this._byEntry[item.config_entry_id] ||= []).push(item);
+    }
+    for (const entry of this._entries) {
+      const remote = this._remoteOf(entry);
+      if (!remote || this._layouts[remote]) continue;
+      const stored = await this._hass.callWS({ type: LAYOUT_GET, key: remote });
+      this._layouts[remote] = (stored && stored.controls) || [];
+    }
+    // The network report and the account list are read again the next time they are drawn.
+    if (this._report !== "loading") this._report = undefined;
+    if (this._account && !this._account.loading && !this._account.adding) this._account = null;
+    // A redraw would throw away an automation, a scene or a name being typed.
+    if (this._auto || this._scene || this._renaming) return;
+    this._render();
+  }
+
+  connectedCallback() {
+    if (!this._ready) return;
+    this._watch();
+    this._watchEntries();
+    this._refreshEntries();
   }
 
   async _loadZigbee() {
@@ -937,6 +1004,11 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._unwatch();
       this._unwatch = null;
     }
+    if (this._unentries) {
+      this._unentries();
+      this._unentries = null;
+    }
+    clearTimeout(this._entriesTimer);
     clearTimeout(this._loginTimer);
     clearTimeout(this._pairTimer);
     this._stopPress();

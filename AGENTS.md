@@ -589,3 +589,9 @@ contradicts your instinct, trust the note.
   the socket drops (a restart), `{type: "result", success: false, error: {code: 3}}`, which
   `err.message || String(err)` printed as "[object Object]". Use `_errText(err)` for any
   error shown on screen; `_lost(err)` + `_whenBack(fn)` retry once the connection is ready.
+- The panel follows `config_entries/subscribe` (this domain, skipping the initial snapshot)
+  and `entity_registry_updated` create/remove, debounced 1.5 s, and `_refreshEntries()`
+  rereads entries and registry, drops the network report and the account list so they are
+  read again, and skips the redraw while an automation, a scene or a name is being edited.
+  `connectedCallback` does the same when the panel comes back, since `_boot` only runs once:
+  before this a new device needed a page reload to show in the list and in the network tab.
