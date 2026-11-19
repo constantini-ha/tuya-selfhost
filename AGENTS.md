@@ -574,3 +574,14 @@ contradicts your instinct, trust the note.
 - The log line "device product id … is not listed in its config" comes from discovery every
   few minutes. `key5ckdnys3pqgec` is shared by a 1-gang (Varanda) and 2-gang switches, so it
   cannot be listed in one config without breaking the other match; those lines are expected.
+- With the account signed in, the add tab lists the account's devices that are not set up
+  (`cloud/devices`, no key in the answer) with an Add button. `cloud/add` runs the normal
+  config flow on the server, answering each form with its own defaults (`_flow_defaults`),
+  so the local key never reaches the browser. If the network search finds no address it
+  stops at the `local` step: with an empty host the auto protocol test spends about 18 s
+  per protocol version, three minutes in all.
+- The account list costs three Tuya calls per device (spec, strategy, report type), about
+  23 s for this account, so `Cloud.async_get_devices(max_age)` keeps it two minutes; the
+  config flow and the panel share it, Refresh asks with `fresh`, and signing out drops it.
+- Every Home Assistant switch goes to Alexa here (`include_domains: switch` in the owner's
+  `configuration.yaml`), so a device added from the panel is exposed to voice at once.
