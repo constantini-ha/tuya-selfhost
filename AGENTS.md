@@ -613,5 +613,6 @@ contradicts your instinct, trust the note.
   falls back to a 3.15 alpha; use a recent one) and needs `--python 3.14`. The BLE code pulls
   `homeassistant.components.bluetooth`, so add `--with pycryptodome --with segno==1.6.6`, the
   `bluetooth`, `usb`, `esphome` (aioesphomeapi) and `frontend` manifest requirements.
-  Even then flow tests end with "Lingering timer ... BaseHaScanner" teardown errors and 3
-  cloud flow tests fail on main: compare against a stash of main before blaming a change.
+  Even then flow tests end with "Lingering timer ... BaseHaScanner" teardown errors and
+  `test_async_setup_entry_cleans_up_failed_device` (x2) and `test_options_flow_modifies_config`
+  fail on main: compare against a stash of main before blaming a change.
