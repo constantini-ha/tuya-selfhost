@@ -214,6 +214,29 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._renaming = null;   // entity_id of the key whose name is being typed
   }
 
+  // Home Assistant rejects with an Error, a {code, message}, or {error: {code: 3}} when the link drops.
+  _errText(err) {
+    if (!err) return "";
+    if (typeof err === "string") return err;
+    if (this._lost(err)) return this._t("connection_lost");
+    const inner = err.error || err;
+    return inner.message || err.message || String(inner.code || err);
+  }
+
+  _lost(err) {
+    return err === 3 || !!(err && (err.code === 3 || (err.error && err.error.code === 3)));
+  }
+
+  _whenBack(fn) {
+    const conn = this._hass.connection;
+    const again = () => {
+      conn.removeEventListener("ready", again);
+      fn();
+    };
+    conn.addEventListener("ready", again);
+    if (conn.connected) again();
+  }
+
   _t(key, vars) {
     return t(this._hass, key, vars);
   }
@@ -426,7 +449,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         await new Promise((done) => setTimeout(done, 150));
       }
     } catch (err) {
-      this._flash = this._t("rename_failed", { err: err.message || String(err) });
+      this._flash = this._t("rename_failed", { err: this._errText(err) });
     }
     this._render();
   }
@@ -534,7 +557,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         this._pressPick = setTimeout(() => this._pickPress(), 700);
       }, "zha_event");
     } catch (err) {
-      draft.error = err.message || String(err);
+      draft.error = this._errText(err);
       this._render();
       return;
     }
@@ -604,7 +627,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._flash = this._t("shortcut_saved");
       this._refreshAutomations();
     } catch (err) {
-      draft.error = this._t("shortcut_failed", { err: err.message || String(err) });
+      draft.error = this._t("shortcut_failed", { err: this._errText(err) });
       this._render();
     }
   }
@@ -616,7 +639,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       await this._hass.callApi("DELETE", "config/automation/config/" + auto.config.id);
       this._refreshAutomations();
     } catch (err) {
-      this._flash = this._t("shortcut_failed", { err: err.message || String(err) });
+      this._flash = this._t("shortcut_failed", { err: this._errText(err) });
       this._render();
     }
   }
@@ -1040,7 +1063,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._confirm = index;
     } catch (err) {
       this._busy = null;
-      this._flash = this._t("nothing_captured", { err: err.message || err });
+      this._flash = this._t("nothing_captured", { err: this._errText(err) });
     }
     this._render();
   }
@@ -1057,7 +1080,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         command: button.command,
       });
     } catch (err) {
-      this._flash = this._t("send_failed", { err: err.message || err });
+      this._flash = this._t("send_failed", { err: this._errText(err) });
       this._render();
     }
   }
@@ -1134,7 +1157,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         : { rows: result.rows, tries: 0, user_code: userCode };
       if (this._login.rows) this._pollLogin();
     } catch (err) {
-      this._login = { failed: err.message || String(err), user_code: userCode };
+      this._login = { failed: this._errText(err), user_code: userCode };
     }
     this._render();
   }
@@ -1188,7 +1211,12 @@ class TuyaSelfhostPanel extends HTMLElement {
       const answer = await this._hass.callWS({ type: CLOUD_DEVICES, fresh });
       this._account = { devices: answer.devices || [] };
     } catch (err) {
-      this._account = { devices: [], error: err.message || String(err) };
+      // Home Assistant restarting: the list comes once it is back.
+      if (this._lost(err)) {
+        this._whenBack(() => this._loadAccount());
+        return;
+      }
+      this._account = { devices: [], error: this._errText(err) };
     }
     this._render();
   }
@@ -1201,7 +1229,15 @@ class TuyaSelfhostPanel extends HTMLElement {
     try {
       answer = await this._hass.callWS({ type: CLOUD_ADD, key: device.key });
     } catch (err) {
-      answer = { ok: false, reason: err.message || String(err) };
+      // The set-up may still finish on the server, so the screen is read again once it is back.
+      if (this._lost(err)) {
+        this._whenBack(async () => {
+          this._account = null;
+          await this._boot();
+        });
+        return;
+      }
+      answer = { ok: false, reason: this._errText(err) };
     }
     if (answer.ok) {
       this._flash = this._t("account_added", { name: answer.title || device.name });
@@ -1426,7 +1462,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     try {
       await this._hass.callService("zha", "permit", { duration: 120 });
     } catch (err) {
-      this._flash = this._t("zigbee_failed", { err: err.message || err });
+      this._flash = this._t("zigbee_failed", { err: this._errText(err) });
       this._render();
       return;
     }
@@ -1484,7 +1520,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       await this._hass.callService("zha", "remove", { ieee: device.zha.ieee });
       this._flash = this._t("zigbee_removed", { name: device.title });
     } catch (err) {
-      this._flash = this._t("zigbee_failed", { err: err.message || err });
+      this._flash = this._t("zigbee_failed", { err: this._errText(err) });
     }
     this._confirmZigbee = null;
     await this._loadZigbee();

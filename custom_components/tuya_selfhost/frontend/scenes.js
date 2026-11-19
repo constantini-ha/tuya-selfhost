@@ -158,7 +158,7 @@ export const SceneMethods = {
     try {
       await this._hass.callService("script", "turn_on", { entity_id: entityId });
     } catch (err) {
-      this._flash = this._t("scene_failed", { err: err.message || String(err) });
+      this._flash = this._t("scene_failed", { err: this._errText(err) });
       this._render();
     }
   },
@@ -181,7 +181,7 @@ export const SceneMethods = {
         adding: null,
       };
     } catch (err) {
-      this._flash = this._t("scene_failed", { err: err.message || String(err) });
+      this._flash = this._t("scene_failed", { err: this._errText(err) });
     }
     this._render();
   },
@@ -235,7 +235,7 @@ export const SceneMethods = {
       await this._hass.callApi("POST", "config/script/config/" + id, config);
     } catch (err) {
       draft.saving = false;
-      draft.error = this._t("scene_failed", { err: err.message || String(err) });
+      draft.error = this._t("scene_failed", { err: this._errText(err) });
       this._render();
       return;
     }
@@ -260,7 +260,7 @@ export const SceneMethods = {
       await this._hass.callApi("DELETE", "config/script/config/" + draft.id);
     } catch (err) {
       draft.confirm = false;
-      draft.error = this._t("scene_failed", { err: err.message || String(err) });
+      draft.error = this._t("scene_failed", { err: this._errText(err) });
       this._render();
       return;
     }

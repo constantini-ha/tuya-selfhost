@@ -164,7 +164,7 @@ export const AutomationMethods = {
         picking: null,
       };
     } catch (err) {
-      this._flash = this._t("scene_failed", { err: err.message || String(err) });
+      this._flash = this._t("scene_failed", { err: this._errText(err) });
     }
     this._render();
   },
@@ -214,7 +214,7 @@ export const AutomationMethods = {
       await this._hass.callApi("POST", "config/automation/config/" + id, config);
     } catch (err) {
       draft.saving = false;
-      draft.error = this._t("scene_failed", { err: err.message || String(err) });
+      draft.error = this._t("scene_failed", { err: this._errText(err) });
       this._render();
       return;
     }
@@ -230,7 +230,7 @@ export const AutomationMethods = {
       await this._hass.callApi("DELETE", "config/automation/config/" + draft.id);
     } catch (err) {
       draft.confirm = false;
-      draft.error = this._t("scene_failed", { err: err.message || String(err) });
+      draft.error = this._t("scene_failed", { err: this._errText(err) });
       this._render();
       return;
     }
@@ -245,7 +245,7 @@ export const AutomationMethods = {
     try {
       await this._hass.callService("automation", on ? "turn_off" : "turn_on", { entity_id: entityId });
     } catch (err) {
-      this._flash = this._t("scene_failed", { err: err.message || String(err) });
+      this._flash = this._t("scene_failed", { err: this._errText(err) });
       this._render();
     }
   },

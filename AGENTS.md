@@ -585,3 +585,7 @@ contradicts your instinct, trust the note.
   config flow and the panel share it, Refresh asks with `fresh`, and signing out drops it.
 - Every Home Assistant switch goes to Alexa here (`include_domains: switch` in the owner's
   `configuration.yaml`), so a device added from the panel is exposed to voice at once.
+- `callWS` rejects in three shapes: an `Error`, a `{code, message}` result error, and, when
+  the socket drops (a restart), `{type: "result", success: false, error: {code: 3}}`, which
+  `err.message || String(err)` printed as "[object Object]". Use `_errText(err)` for any
+  error shown on screen; `_lost(err)` + `_whenBack(fn)` retry once the connection is ready.
