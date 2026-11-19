@@ -309,7 +309,38 @@ class Cloud:
                 }
                 for entry in result.get("dpStatusRelationDTOS") or []
             ],
+            "fields": sorted(vars(device)),
+            "status_fields": sorted(result),
+            "datapoint_fields": sorted(
+                {k for entry in result.get("dpStatusRelationDTOS") or [] for k in entry}
+            ),
+            "names": await self._async_probe_names(manager, device_id),
         }
+
+    async def _async_probe_names(self, manager, device_id: str) -> dict[str, Any]:
+        """Where Tuya keeps the names given to each key in the app (read only)."""
+        found = {}
+        for path in (
+            f"/v1.0/m/life/devices/{device_id}/multiple-names",
+            f"/v1.0/m/life/ha/devices/{device_id}/multiple-names",
+            f"/v1.0/m/life/devices/{device_id}/dp-names",
+            f"/v1.0/m/life/ha/{device_id}/dp-names",
+            f"/v1.0/devices/{device_id}/multiple-names",
+        ):
+            try:
+                answer = await self.__hass.async_add_executor_job(manager.customer_api.get, path)
+            except Exception as err:  # noqa: BLE001
+                found[path.replace(device_id, "<id>")] = {"error": str(err)[:120]}
+                continue
+            answer = answer or {}
+            body = answer.get("result")
+            found[path.replace(device_id, "<id>")] = {
+                "success": answer.get("success"),
+                "code": answer.get("code"),
+                "msg": str(answer.get("msg") or "")[:120],
+                "result": body if isinstance(body, (dict, list)) and len(str(body)) < 800 else type(body).__name__,
+            }
+        return found
 
     async def async_get_datamodel(self, device_id) -> dict[str, Any] | None:
         """Get the data model for the specified device (QueryThingsDataModel)."""
