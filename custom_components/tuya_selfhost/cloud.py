@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.storage import Store
 from tuya_sharing import (
     CustomerDevice,
@@ -15,8 +16,10 @@ from tuya_sharing import (
 
 from .const import (
     CONF_DEVICE_CID,
+    CONF_DEVICE_ID,
     CONF_ENDPOINT,
     CONF_LOCAL_KEY,
+    CONF_MODEL,
     CONF_TERMINAL_ID,
     DOMAIN,
     TUYA_CLIENT_ID,
@@ -194,7 +197,30 @@ class Cloud:
             return self._mark_existing(copy.deepcopy(cache["devices"]))
         found = await self._async_fetch_devices()
         cache.update(at=time.monotonic(), devices=found)
+        self._keep_product_names(found)
         return self._mark_existing(copy.deepcopy(found))
+
+    def _keep_product_names(self, cloud_devices: dict[str, Any]) -> None:
+        """Devices added before their product name was kept learn it, for their icon."""
+        names = {}
+        for device in cloud_devices.values():
+            sub = device.get("node_id")
+            for key in {sub, device.get("uuid")} if sub else {device.get("id")}:
+                if key and device.get("product_name"):
+                    names[key] = device["product_name"]
+        for entry in self.__hass.config_entries.async_entries(DOMAIN):
+            name = names.get(
+                entry.data.get(CONF_DEVICE_CID) or entry.data.get(CONF_DEVICE_ID)
+            )
+            if not name or entry.data.get(CONF_MODEL):
+                continue
+            self.__hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_MODEL: name}
+            )
+            registry = dr.async_get(self.__hass)
+            for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
+                if not device.model and not device.via_device_id:
+                    registry.async_update_device(device.id, model=name)
 
     def _mark_existing(self, cloud_devices: dict[str, Any]) -> dict[str, Any]:
         domain_data = self.__hass.data.get(DOMAIN)

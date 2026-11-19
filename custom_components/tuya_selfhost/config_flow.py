@@ -675,9 +675,11 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             title = user_input[CONF_NAME]
             del user_input[CONF_NAME]
-            return self.async_create_entry(
-                title=title, data={**self.data, **user_input}
-            )
+            data = {**self.data, **user_input}
+            # Tuya's product name tells the panel what the device is, whatever the house names it.
+            if not data.get(CONF_MODEL) and (self.__cloud_device or {}).get("product_name"):
+                data[CONF_MODEL] = self.__cloud_device["product_name"]
+            return self.async_create_entry(title=title, data=data)
         default_name = config.name
         if self.__cloud_device and self.__cloud_device.get("name"):
             default_name = self.__cloud_device["name"]

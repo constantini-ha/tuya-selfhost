@@ -276,6 +276,55 @@ class TestGetDevices:
             assert devices["hub_001/"]["is_hub"] is True
 
 
+    @pytest.mark.asyncio
+    async def test_get_devices_keeps_product_name_as_model(self, cloud, mock_hass):
+        cloud._Cloud__authentication = {
+            "user_code": "uc",
+            "terminal_id": "tid",
+            "endpoint": "ep",
+            "token_info": {"access_token": "at"},
+        }
+
+        mock_device = MagicMock()
+        mock_device.category = "kg"
+        mock_device.id = "dev_fence"
+        mock_device.ip = "192.168.1.101"
+        mock_device.local_key = "lk"
+        mock_device.name = "Portão"
+        mock_device.node_id = ""
+        mock_device.online = True
+        mock_device.product_id = "prod_fence"
+        mock_device.product_name = "Eletrificador de cerca"
+        mock_device.uid = "uid_fence"
+        mock_device.uuid = "uuid_fence"
+        mock_device.support_local = True
+
+        unnamed = MagicMock(entry_id="e1", data={"device_id": "dev_fence"})
+        named = MagicMock(entry_id="e2", data={"device_id": "dev_fence", "model": "X1"})
+        other = MagicMock(entry_id="e3", data={"device_id": "dev_other"})
+        mock_hass.config_entries.async_entries.return_value = [unnamed, named, other]
+        main = MagicMock(id="d1", model=None, via_device_id=None)
+        key = MagicMock(id="d2", model=None, via_device_id="d1")
+
+        with (
+            patch("custom_components.tuya_selfhost.cloud.Manager") as MockManager,
+            patch("custom_components.tuya_selfhost.cloud.dr") as mock_dr,
+        ):
+            mock_manager = MockManager.return_value
+            mock_manager.device_map = {"dev_fence": mock_device}
+            mock_manager.update_device_cache = MagicMock()
+            mock_dr.async_entries_for_config_entry.return_value = [main, key]
+
+            await cloud.async_get_devices()
+
+        mock_hass.config_entries.async_update_entry.assert_called_once_with(
+            unnamed, data={"device_id": "dev_fence", "model": "Eletrificador de cerca"}
+        )
+        mock_dr.async_get.return_value.async_update_device.assert_called_once_with(
+            "d1", model="Eletrificador de cerca"
+        )
+
+
 class TestGetDatamodel:
     @pytest.mark.asyncio
     async def test_get_datamodel(self, cloud, mock_hass):

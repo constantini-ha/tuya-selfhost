@@ -599,7 +599,19 @@ contradicts your instinct, trust the note.
   opens Tuya's whitelisted `/v1.0/m/life/ha/...` paths (others answer 1108 "uri path
   invalid", `/v1.0/devices/{id}/multiple-names` answers 2008), and the device object has no
   name per key (fields checked on the fence relay, 11/2026). Names are typed once here.
-- Key kinds (`OUTLET_KINDS`) now also come from the key's own name when nobody chose one
-  (`words`, pt/en/es): fence, siren, zone, pump and light. `keyOwnName` strips the device
-  name from the friendly name, or every key of "Eletrificador de cerca" would be a fence.
-  The device list icon comes from the device name first, then sockets (`plug` kinds).
+- Key kinds (`OUTLET_KINDS`) also come from the key's own name when nobody chose one
+  (`words`, pt/en/es), but only for fence, siren and zone. Pump and light are manual only:
+  the owner wants a wall key (the pump breaker, "Luz sala") to stay a rocker like the others.
+  `keyOwnName` strips the device name and returns "" for an unnamed key, so a device called
+  "Interruptor Bomba" does not turn its only key into a pump.
+- The device icon comes from what the device is, never from what the house calls it:
+  Tuya's `product_name` ("Eletrificador de cerca", "Din Rail Wi-Fi Switch with metering")
+  is kept as `CONF_MODEL` when the device YAML has no model (config flow), and entries
+  added before 2026.11.68 learn it whenever the account list is fetched
+  (`Cloud._keep_product_names`, also updates the registry model). `deviceKind` reads it.
+- Tests on this Umbrel (11/2026): `uv` lives in `~/.local/bin` (0.9.x only knows 3.14.0 and
+  falls back to a 3.15 alpha; use a recent one) and needs `--python 3.14`. The BLE code pulls
+  `homeassistant.components.bluetooth`, so add `--with pycryptodome --with segno==1.6.6`, the
+  `bluetooth`, `usb`, `esphome` (aioesphomeapi) and `frontend` manifest requirements.
+  Even then flow tests end with "Lingering timer ... BaseHaScanner" teardown errors and 3
+  cloud flow tests fail on main: compare against a stash of main before blaming a change.

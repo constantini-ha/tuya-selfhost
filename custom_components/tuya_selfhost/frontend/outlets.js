@@ -63,7 +63,7 @@ const SOCKET_ICONS = {
   fr: "mdi:power-socket-fr", de: "mdi:power-socket-de", eu: "mdi:power-socket-eu",
 };
 
-// `words` let a key named in the vendor app or here pick its kind on its own (pt, en, es).
+// `words` name what a fence energizer is and drives (pt, en, es); a wall key stays a rocker.
 export const OUTLET_KINDS = [
   { id: "key", label: "kind_key" },
   { id: "outlet", label: "kind_outlet", socket: true, plug: true },
@@ -73,11 +73,8 @@ export const OUTLET_KINDS = [
   { id: "fence", label: "kind_fence", icon: "mdi:fence-electric", words: /cerca|eletrifica|electrifi|fence/i },
   { id: "siren", label: "kind_siren", icon: "mdi:alarm-light", words: /siren|alarm/i },
   { id: "zone", label: "kind_zone", icon: "mdi:shield-home", words: /\b(setor|zona|sector|zone)\b/i },
-  { id: "pump", label: "kind_pump", icon: "mdi:water-pump", words: /bomba|pump/i },
-  {
-    id: "light", label: "kind_light", icon: "mdi:lightbulb",
-    words: /\b(luz|luzes|l[aâ]mpada|abajur|lustre|lumin[aá]ria|light|lamp|l[aá]mpara)\b/i,
-  },
+  { id: "pump", label: "kind_pump", icon: "mdi:water-pump" },
+  { id: "light", label: "kind_light", icon: "mdi:lightbulb" },
 ];
 
 export function kindByName(name) {
@@ -91,8 +88,18 @@ export function keyOwnName(hass, entityId) {
   const entry = (hass.entities || {})[entityId];
   const device = entry && (hass.devices || {})[entry.device_id];
   const prefix = device && (device.name_by_user || device.name);
-  const own = prefix && full.startsWith(prefix) ? full.slice(prefix.length).trim() : full;
-  return own || full;
+  return prefix && full.startsWith(prefix) ? full.slice(prefix.length).trim() : full;
+}
+
+// What a device is comes from Tuya's product name, kept as its model, never from what the house calls it.
+export function deviceKind(hass, entryId, entityId) {
+  const devices = (hass && hass.devices) || {};
+  const entity = entityId && (hass.entities || {})[entityId];
+  const device = entity
+    ? devices[entity.device_id]
+    : Object.values(devices).find(
+      (d) => !d.via_device_id && (d.config_entries || []).includes(entryId));
+  return kindByName(device && device.model);
 }
 
 export const OUTLET_CSS = `

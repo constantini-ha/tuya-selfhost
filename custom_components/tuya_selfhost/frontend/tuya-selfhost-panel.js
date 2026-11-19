@@ -1,5 +1,5 @@
 import { t } from "./i18n.js";
-import { OUTLET_CSS, OUTLET_KINDS, keyOwnName, kindByName, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
+import { OUTLET_CSS, OUTLET_KINDS, deviceKind, keyOwnName, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
   outletNames, saveOutletKinds } from "./outlets.js";
 
 import { SCENE_CSS, SceneMethods } from "./scenes.js";
@@ -456,12 +456,13 @@ class TuyaSelfhostPanel extends HTMLElement {
     return null;
   }
 
-  // The row wears what the device is: its name first (a fence, a pump), a socket only
+  // The row wears what the device is: its type first (a fence energizer), a socket only
   // when its keys are sockets.
   _deviceGlyph(entry) {
-    const named = kindByName(entry.title);
-    if (named) return `<ha-icon icon="${named.icon}"></ha-icon>`;
-    const plugs = this._gangsOf(entry).some((item) => {
+    const gangs = this._gangsOf(entry);
+    const typed = deviceKind(this._hass, entry.entry_id, gangs[0] && gangs[0].entity_id);
+    if (typed) return `<ha-icon icon="${typed.icon}"></ha-icon>`;
+    const plugs = gangs.some((item) => {
       const state = this._hass.states[item.entity_id];
       const kind = outletKind(this._kinds, item.entity_id,
         state && state.attributes.device_class);

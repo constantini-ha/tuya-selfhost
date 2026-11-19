@@ -1,5 +1,5 @@
 import { t, tn } from "./i18n.js";
-import { OUTLET_CSS, kindByName, loadOutletKinds, outletGlyph, outletNames } from "./outlets.js";
+import { OUTLET_CSS, deviceKind, loadOutletKinds, outletGlyph, outletNames } from "./outlets.js";
 
 const STYLE = `
   .pad { padding:16px }
@@ -289,7 +289,8 @@ class TuyaSelfhostDeviceCard extends HTMLElement {
       const area = this._area();
       head.innerHTML = `
         <span class="glyph"><ha-icon icon="${this._config.icon ||
-          (kindByName(this._config.title) || {}).icon || "mdi:light-switch"}"></ha-icon></span>
+          (deviceKind(this._hass, this._config.entry_id, (this._gangs || [])[0]) || {}).icon ||
+          "mdi:light-switch"}"></ha-icon></span>
         <span class="grow">
           <div class="name">${this._config.title || t(this._hass, "col_device")}</div>
           <div class="sub">${[area, this._summary()].filter(Boolean).join(" · ")}</div>

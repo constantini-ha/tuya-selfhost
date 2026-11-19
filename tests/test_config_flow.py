@@ -699,6 +699,35 @@ async def test_flow_choose_entities_creates_config_entry(hass, bypass_setup, moc
 
 
 @pytest.mark.asyncio
+async def test_flow_choose_entities_keeps_cloud_product_name(hass, bypass_setup, mocker):
+    """Tuya's product name becomes the model when the device config has none."""
+    mocker.patch.dict(
+        config_flow.ConfigFlowHandler.data,
+        {
+            CONF_DEVICE_ID: "deviceid",
+            CONF_LOCAL_KEY: TESTKEY,
+            CONF_HOST: "hostname",
+            CONF_POLL_ONLY: False,
+            CONF_PROTOCOL_VERSION: "auto",
+            CONF_TYPE: "kogan_kahtp_heater",
+            CONF_DEVICE_CID: None,
+        },
+    )
+    mocker.patch.object(
+        config_flow.ConfigFlowHandler,
+        "_ConfigFlowHandler__cloud_device",
+        {"name": "Portão", "product_name": "Eletrificador de cerca"},
+    )
+    flow = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "choose_entities"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], user_input={CONF_NAME: "test"}
+    )
+    assert result["data"]["model"] == "Eletrificador de cerca"
+
+
+@pytest.mark.asyncio
 async def test_options_flow_init(hass, bypass_data_fetch):
     """Test config flow options."""
     config_entry = MockConfigEntry(
