@@ -229,7 +229,9 @@ async def websocket_cloud_ble_probe(hass, connection, msg) -> None:
 
 
 @websocket_api.require_admin
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/cloud/devices"})
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/cloud/devices", vol.Optional("fresh", default=False): bool}
+)
 @websocket_api.async_response
 async def websocket_cloud_devices(hass, connection, msg) -> None:
     """The account's devices that are not set up here yet, without any key."""
@@ -238,7 +240,7 @@ async def websocket_cloud_devices(hass, connection, msg) -> None:
         connection.send_result(msg["id"], {"authenticated": False, "devices": []})
         return
     try:
-        found = await cloud.async_get_devices()
+        found = await cloud.async_get_devices(max_age=0 if msg["fresh"] else 120)
     except Exception as err:  # noqa: BLE001
         connection.send_error(msg["id"], "cloud_failed", str(err))
         return
@@ -316,6 +318,10 @@ async def websocket_cloud_add(hass, connection, msg) -> None:
             answer = answers.get(step)
             if answer is None:
                 answer = _flow_defaults(result.get("data_schema"))
+            # Without an address the connection test tries every protocol for minutes.
+            if step == "local" and not answer.get("host"):
+                reason = "connection"
+                break
             result = await flows.async_configure(flow_id, answer)
         else:
             reason = "too_many_steps"

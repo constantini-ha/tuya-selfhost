@@ -155,7 +155,9 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         self.cloud.logout()
 
                     if self.cloud.is_authenticated:
-                        self.__cloud_devices = await self.cloud.async_get_devices()
+                        self.__cloud_devices = await self.cloud.async_get_devices(
+                            max_age=120
+                        )
                         return await self.async_step_choose_device()
                 except Exception as e:
                     # Re-authentication is needed.

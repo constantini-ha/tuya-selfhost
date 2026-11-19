@@ -1,4 +1,6 @@
+import copy
 import logging
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -181,8 +183,31 @@ class Cloud:
             TokenListener(self.__hass),
         )
 
-    async def async_get_devices(self) -> dict[str, Any]:
-        """Get all devices associated with the account."""
+    async def async_get_devices(self, max_age: float = 0) -> dict[str, Any]:
+        """Get all devices associated with the account.
+
+        Tuya answers three calls per device, about a second each, so a list
+        younger than `max_age` seconds is handed back again.
+        """
+        cache = self.__hass.data[DOMAIN].setdefault("cloud_devices", {})
+        if max_age and cache.get("devices") and time.monotonic() - cache["at"] < max_age:
+            return self._mark_existing(copy.deepcopy(cache["devices"]))
+        found = await self._async_fetch_devices()
+        cache.update(at=time.monotonic(), devices=found)
+        return self._mark_existing(copy.deepcopy(found))
+
+    def _mark_existing(self, cloud_devices: dict[str, Any]) -> dict[str, Any]:
+        domain_data = self.__hass.data.get(DOMAIN)
+        for cloud_device in cloud_devices.values():
+            existing_id = domain_data.get(cloud_device["id"]) if domain_data else None
+            existing_uuid = (
+                domain_data.get(cloud_device["uuid"]) if domain_data else None
+            )
+            existing = existing_id or existing_uuid
+            cloud_device["exists"] = existing and bool(existing.get("device"))
+        return cloud_devices
+
+    async def _async_fetch_devices(self) -> dict[str, Any]:
         manager = self._manager()
 
         listener = DeviceListener(self.__hass, manager)
@@ -191,9 +216,7 @@ class Cloud:
         # Get all devices from Tuya cloud
         await self.__hass.async_add_executor_job(manager.update_device_cache)
 
-        # Register known device IDs
         cloud_devices = {}
-        domain_data = self.__hass.data.get(DOMAIN)
         for device in manager.device_map.values():
             cloud_device = {
                 "category": device.category,
@@ -219,12 +242,6 @@ class Cloud:
             }
             _LOGGER.debug("Found device: %s", cloud_device["product_name"])
 
-            existing_id = domain_data.get(cloud_device["id"]) if domain_data else None
-            existing_uuid = (
-                domain_data.get(cloud_device["uuid"]) if domain_data else None
-            )
-            existing = existing_id or existing_uuid
-            cloud_device["exists"] = existing and existing.get("device")
             if hasattr(device, "node_id"):
                 index = "/".join(
                     [
@@ -323,6 +340,7 @@ class Cloud:
         _LOGGER.debug("Logging out from Tuya cloud")
         # Clear authentication cache
         self.__hass.data[DOMAIN]["auth_cache"] = None
+        self.__hass.data[DOMAIN].pop("cloud_devices", None)
         self.__authentication = {}
         persist_auth(self.__hass)
 

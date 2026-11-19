@@ -178,6 +178,9 @@ ${AUTO_CSS}
 .acct .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .acct button.act { flex:none }
 .acct button.act[disabled] { opacity:.5; cursor:default }
+.waiting { display:flex; flex-direction:column; align-items:center; gap:8px; padding:22px 0 10px;
+  color:var(--secondary-text-color); font-size:.85em }
+.waiting img { width:56px; height:56px }
 .block:last-child { border-bottom:0 }
 .block h3 { margin:0 0 6px; font-size:15px; font-weight:500 }
 .net { display:flex; align-items:center; gap:12px; padding:10px 0;
@@ -1178,10 +1181,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
-  async _loadAccount() {
+  async _loadAccount(fresh = false) {
     this._account = { loading: true };
+    if (fresh) this._render();
     try {
-      const answer = await this._hass.callWS({ type: CLOUD_DEVICES });
+      const answer = await this._hass.callWS({ type: CLOUD_DEVICES, fresh });
       this._account = { devices: answer.devices || [] };
     } catch (err) {
       this._account = { devices: [], error: err.message || String(err) };
@@ -1230,7 +1234,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     again.className = "act ghost";
     again.textContent = this._t("account_refresh");
     again.disabled = !!(this._account && (this._account.loading || this._account.adding));
-    again.addEventListener("click", () => this._loadAccount());
+    again.addEventListener("click", () => this._loadAccount(true));
     head.appendChild(again);
     block.appendChild(head);
 
@@ -1244,7 +1248,16 @@ class TuyaSelfhostPanel extends HTMLElement {
       block.appendChild(line);
     };
     if (account.loading) {
-      note(this._t("account_loading"));
+      const wait = document.createElement("div");
+      wait.className = "waiting";
+      const logo = document.createElement("img");
+      logo.src = "/static/images/home-assistant-logo-loading.svg";
+      logo.alt = "";
+      logo.addEventListener("error", () => logo.remove());
+      const text = document.createElement("span");
+      text.textContent = this._t("account_loading");
+      wait.append(logo, text);
+      block.appendChild(wait);
       return block;
     }
     if (account.error) note(this._t("account_list_failed", { err: account.error }));
