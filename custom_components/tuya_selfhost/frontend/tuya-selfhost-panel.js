@@ -12,6 +12,8 @@ const CLOUD_STATUS = "tuya_selfhost/cloud/status";
 const CLOUD_QR = "tuya_selfhost/cloud/qr";
 const CLOUD_LOGIN = "tuya_selfhost/cloud/login";
 const CLOUD_LOGOUT = "tuya_selfhost/cloud/logout";
+const CLOUD_DEVICES = "tuya_selfhost/cloud/devices";
+const CLOUD_ADD = "tuya_selfhost/cloud/add";
 const ZHA_DEVICES = "zha/devices";
 
 const ICONS = [
@@ -167,6 +169,15 @@ ${AUTO_CSS}
 .subtab[aria-selected="true"] { background:var(--primary-color); border-color:transparent;
   color:var(--text-primary-color) }
 .block { padding:16px; border-bottom:1px solid var(--divider-color) }
+.blockhead { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.blockhead h3 { margin:0 }
+.acct { display:flex; align-items:center; gap:12px; padding:12px 0;
+  border-top:1px solid var(--divider-color) }
+.acct:first-of-type { border-top:none }
+.acct .grow { flex:1; min-width:0 }
+.acct .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.acct button.act { flex:none }
+.acct button.act[disabled] { opacity:.5; cursor:default }
 .block:last-child { border-bottom:0 }
 .block h3 { margin:0 0 6px; font-size:15px; font-weight:500 }
 .net { display:flex; align-items:center; gap:12px; padding:10px 0;
@@ -1137,6 +1148,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       }
       if (result.ok) {
         this._login = null;
+        this._account = null;
         await this._cloudStatus();
         this._flash = this._t("cloud_done");
         this._render();
@@ -1161,8 +1173,115 @@ class TuyaSelfhostPanel extends HTMLElement {
       /* the account is gone either way as far as this panel is concerned */
     }
     this._login = null;
+    this._account = null;
     await this._cloudStatus();
     this._render();
+  }
+
+  async _loadAccount() {
+    this._account = { loading: true };
+    try {
+      const answer = await this._hass.callWS({ type: CLOUD_DEVICES });
+      this._account = { devices: answer.devices || [] };
+    } catch (err) {
+      this._account = { devices: [], error: err.message || String(err) };
+    }
+    this._render();
+  }
+
+  // The whole set-up runs on the server with the form's own defaults; the key stays there.
+  async _addAccount(device) {
+    this._account = { ...this._account, adding: device.key };
+    this._render();
+    let answer;
+    try {
+      answer = await this._hass.callWS({ type: CLOUD_ADD, key: device.key });
+    } catch (err) {
+      answer = { ok: false, reason: err.message || String(err) };
+    }
+    if (answer.ok) {
+      this._flash = this._t("account_added", { name: answer.title || device.name });
+      this._account = null;
+      await this._boot();
+      return;
+    }
+    const known = {
+      connection: "account_fail_connection",
+      already_configured: "account_fail_exists",
+      already_in_progress: "account_fail_busy",
+      not_supported: "account_fail_unsupported",
+    }[answer.reason];
+    this._flash = this._t("account_failed", {
+      name: device.name,
+      err: known ? this._t(known) : answer.reason,
+    });
+    this._account = { ...this._account, adding: null };
+    this._render();
+  }
+
+  _accountBlock() {
+    const block = document.createElement("div");
+    block.className = "block";
+    const head = document.createElement("div");
+    head.className = "blockhead";
+    head.innerHTML = `<h3></h3>`;
+    head.querySelector("h3").textContent = this._t("account_devices");
+    const again = document.createElement("button");
+    again.className = "act ghost";
+    again.textContent = this._t("account_refresh");
+    again.disabled = !!(this._account && (this._account.loading || this._account.adding));
+    again.addEventListener("click", () => this._loadAccount());
+    head.appendChild(again);
+    block.appendChild(head);
+
+    if (!this._account) this._loadAccount();
+    const account = this._account;
+    const note = (text) => {
+      const line = document.createElement("div");
+      line.className = "muted";
+      line.style.marginTop = "10px";
+      line.textContent = text;
+      block.appendChild(line);
+    };
+    if (account.loading) {
+      note(this._t("account_loading"));
+      return block;
+    }
+    if (account.error) note(this._t("account_list_failed", { err: account.error }));
+    else if (!account.devices.length) note(this._t("account_none"));
+    const list = document.createElement("div");
+    list.style.marginTop = "6px";
+    for (const device of account.devices) {
+      const row = document.createElement("div");
+      row.className = "acct";
+      const text = document.createElement("div");
+      text.className = "grow";
+      text.innerHTML = `<div class="nm"></div><div class="muted nm"></div>`;
+      text.firstChild.textContent = device.name;
+      text.lastChild.textContent = [
+        device.product,
+        device.online ? "" : this._t("account_offline"),
+      ].filter(Boolean).join(" · ");
+      row.appendChild(text);
+      if (device.blocked) {
+        const why = document.createElement("span");
+        why.className = "muted";
+        why.textContent = this._t(`account_${device.blocked}`);
+        row.appendChild(why);
+      } else {
+        const add = document.createElement("button");
+        add.className = "act";
+        add.textContent = account.adding === device.key
+          ? this._t("account_adding")
+          : this._t("account_add");
+        add.disabled = !!account.adding;
+        add.addEventListener("click", () => this._addAccount(device));
+        row.appendChild(add);
+      }
+      list.appendChild(row);
+    }
+    block.appendChild(list);
+    return block;
   }
 
   _qrSquare(rows) {
@@ -1596,6 +1715,7 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   _tabAdd() {
     const box = document.createElement("div");
+    if (this._cloud && this._cloud.authenticated) box.appendChild(this._accountBlock());
     const cloud = document.createElement("div");
     cloud.className = "block";
     cloud.innerHTML = `<h3>${this._t("add_cloud")}</h3>`;

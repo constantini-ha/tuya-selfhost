@@ -11,11 +11,19 @@ from typing import Any
 import segno
 import voluptuous as vol
 from homeassistant.components import websocket_api
+from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.storage import Store
 
 from .cloud import Cloud
-from .const import DOMAIN, TUYA_RESPONSE_MSG
+from .const import (
+    CONF_DEVICE_CID,
+    CONF_DEVICE_ID,
+    CONF_LOCAL_KEY,
+    DOMAIN,
+    TUYA_RESPONSE_MSG,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +46,8 @@ async def async_setup_cloud_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_cloud_logout)
     websocket_api.async_register_command(hass, websocket_cloud_inspect)
     websocket_api.async_register_command(hass, websocket_cloud_ble_probe)
+    websocket_api.async_register_command(hass, websocket_cloud_devices)
+    websocket_api.async_register_command(hass, websocket_cloud_add)
 
 
 def _login_state(hass: HomeAssistant) -> dict[str, Any]:
@@ -216,3 +226,106 @@ async def websocket_cloud_ble_probe(hass, connection, msg) -> None:
             except Exception as e:
                 _LOGGER.debug("Bluetooth close failed: %s %s", type(e).__name__, e)
     connection.send_result(msg["id"], result)
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/cloud/devices"})
+@websocket_api.async_response
+async def websocket_cloud_devices(hass, connection, msg) -> None:
+    """The account's devices that are not set up here yet, without any key."""
+    cloud = Cloud(hass)
+    if not cloud.is_authenticated:
+        connection.send_result(msg["id"], {"authenticated": False, "devices": []})
+        return
+    try:
+        found = await cloud.async_get_devices()
+    except Exception as err:  # noqa: BLE001
+        connection.send_error(msg["id"], "cloud_failed", str(err))
+        return
+    known = set()
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        known.update(filter(None, (entry.data.get(CONF_DEVICE_ID), entry.data.get(CONF_DEVICE_CID))))
+    devices = []
+    for key, device in found.items():
+        sub = device.get("node_id")
+        mine = {sub, device.get("uuid")} if sub else {device.get("id")}
+        if device.get("exists") or mine & known:
+            continue
+        if device.get("support_local") is False or not device.get(CONF_LOCAL_KEY):
+            why = "cloud_only"
+        elif not device.get("ip"):
+            why = "needs_hub"
+        else:
+            why = None
+        devices.append(
+            {
+                "key": key,
+                "name": device.get("name") or device.get("product_name") or key,
+                "product": device.get("product_name") or "",
+                "online": bool(device.get("online")),
+                "blocked": why,
+            }
+        )
+    devices.sort(key=lambda d: (d["blocked"] is not None, d["name"].lower()))
+    connection.send_result(msg["id"], {"authenticated": True, "devices": devices})
+
+
+def _flow_defaults(schema) -> dict[str, Any]:
+    answer = {}
+    for marker in getattr(schema, "schema", {}) or {}:
+        default = getattr(marker, "default", vol.UNDEFINED)
+        if default is not vol.UNDEFINED:
+            answer[str(marker.schema)] = default() if callable(default) else default
+    return answer
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/cloud/add", vol.Required("key"): str}
+)
+@websocket_api.async_response
+async def websocket_cloud_add(hass, connection, msg) -> None:
+    """Set one account device up, taking every default the form would offer.
+
+    The flow runs here so the device's key never travels to the browser.
+    """
+    flows = hass.config_entries.flow
+    answers = {
+        "user": {"setup_mode": "cloud"},
+        "choose_device": {"device_id": msg["key"], "hub_id": "None"},
+        "search": {},
+    }
+    flow_id = None
+    try:
+        result = await flows.async_init(
+            DOMAIN, context={"source": SOURCE_USER, "user_id": connection.user.id}
+        )
+        for _ in range(10):
+            flow_id = result.get("flow_id")
+            if result["type"] == FlowResultType.CREATE_ENTRY:
+                connection.send_result(msg["id"], {"ok": True, "title": result["title"]})
+                return
+            if result["type"] == FlowResultType.ABORT:
+                connection.send_result(msg["id"], {"ok": False, "reason": result["reason"]})
+                return
+            if result["type"] != FlowResultType.FORM or result.get("errors"):
+                errors = result.get("errors") or {}
+                reason = next(iter(errors.values()), str(result["type"]))
+                break
+            step = result["step_id"]
+            answer = answers.get(step)
+            if answer is None:
+                answer = _flow_defaults(result.get("data_schema"))
+            result = await flows.async_configure(flow_id, answer)
+        else:
+            reason = "too_many_steps"
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning("Adding an account device failed: %s", err)
+        reason = str(err) or type(err).__name__
+    if flow_id:
+        try:
+            flows.async_abort(flow_id)
+        except Exception:  # noqa: BLE001
+            pass
+    connection.send_result(msg["id"], {"ok": False, "reason": reason})
+
