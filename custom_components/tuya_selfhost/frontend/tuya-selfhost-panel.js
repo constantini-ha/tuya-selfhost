@@ -187,6 +187,14 @@ ${AUTO_CSS}
   border-bottom:1px solid var(--divider-color) }
 .net:last-child { border-bottom:0 }
 .mono { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px }
+button.copyable { font:inherit; color:inherit; background:none; border:0; cursor:pointer;
+  padding:4px 5px; margin:-4px -5px; border-radius:6px; -webkit-tap-highlight-color:transparent;
+  text-decoration:underline dotted color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset:3px; transition:color .15s, background-color .15s, transform .1s }
+@media (hover:hover) {
+  button.copyable:hover { color:var(--primary-color); background:rgba(127,127,127,.12) } }
+button.copyable:active { transform:scale(.96); background:rgba(127,127,127,.2) }
+button.copyable:focus-visible { outline:2px solid var(--primary-color); outline-offset:1px }
 pre.mono { margin:0; padding:12px; border-radius:10px; overflow:auto; max-height:260px;
   background:var(--code-editor-background-color,rgba(127,127,127,.12)) }
 a.link { color:var(--primary-color); text-decoration:none; font-size:14px }
@@ -1730,8 +1738,10 @@ class TuyaSelfhostPanel extends HTMLElement {
       document.execCommand("copy");
       area.remove();
     }
-    this._flash = label;
-    this._render();
+    this.dispatchEvent(new CustomEvent("hass-notification", {
+      // Same id: the next copy rewrites the open toast instead of stacking another.
+      detail: { message: label, id: "tuya-selfhost-copy" }, bubbles: true, composed: true,
+    }));
   }
 
   async _loadReport() {
@@ -1976,6 +1986,13 @@ class TuyaSelfhostPanel extends HTMLElement {
     return box;
   }
 
+  _copyable(value) {
+    return value
+      ? `<button class="copyable" data-copy="${value}" aria-label="${
+        this._t("copy_value", { value })}">${value}</button>`
+      : "";
+  }
+
   _tabNetwork() {
     const box = document.createElement("div");
     const head = document.createElement("div");
@@ -2004,8 +2021,8 @@ class TuyaSelfhostPanel extends HTMLElement {
       row.innerHTML = `
         <div class="grow">
           <div>${device.name}</div>
-          <div class="muted mono">${device.host || "—"} · ${
-            device.mac || this._t("no_mac")
+          <div class="muted mono">${this._copyable(device.host) || "—"} · ${
+            this._copyable(device.mac) || this._t("no_mac")
           }</div>
           ${
             advice
@@ -2014,6 +2031,9 @@ class TuyaSelfhostPanel extends HTMLElement {
           }
         </div>
         <span class="pill ${tone}">${this._t(label)}</span>`;
+      row.querySelectorAll("button.copyable").forEach((button) =>
+        button.addEventListener("click", () => this._copy(button.dataset.copy,
+          this._t("copied_value", { value: button.dataset.copy }))));
       body.appendChild(row);
     }
     box.appendChild(body);
@@ -2022,24 +2042,13 @@ class TuyaSelfhostPanel extends HTMLElement {
     foot.className = "block";
     foot.innerHTML = `<div class="muted">${this._t("mac_hint")}</div>`;
 
-    const macs = this._report
-      .filter((d) => d.block_recommended && d.mac)
-      .map((d) => `${d.mac}  ${d.name}`)
-      .join("\n");
-    const copy = document.createElement("button");
-    copy.className = "act ghost";
-    copy.style.marginTop = "10px";
-    copy.textContent = this._t("copy_macs");
-    copy.disabled = !macs;
-    copy.addEventListener("click", () => this._copy(macs, this._t("copied")));
-
     const again = document.createElement("button");
     again.className = "act ghost";
     again.style.marginTop = "10px";
     again.textContent = this._t("refresh");
     again.addEventListener("click", () => this._loadReport());
 
-    foot.append(copy, again);
+    foot.append(again);
     box.appendChild(foot);
     return box;
   }

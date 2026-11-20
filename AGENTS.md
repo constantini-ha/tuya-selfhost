@@ -616,3 +616,8 @@ contradicts your instinct, trust the note.
   Even then flow tests end with "Lingering timer ... BaseHaScanner" teardown errors and
   `test_async_setup_entry_cleans_up_failed_device` (x2) and `test_options_flow_modifies_config`
   fail on main: compare against a stash of main before blaming a change.
+- Copy feedback is Home Assistant's own toast: `_copy` fires `hass-notification` (bubbles,
+  composed) with a fixed `id`, so a second copy rewrites the open toast instead of stacking
+  one more (`notification-manager` skips the hide when the id matches). The network list
+  copies one IP or MAC per tap (`button.copyable`); the "copy every MAC" button is gone.
+  Hover colors sit under `@media (hover:hover)`: on a phone a tapped value stayed lit.
