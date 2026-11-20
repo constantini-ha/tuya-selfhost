@@ -265,14 +265,20 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
         return {"available": False, "radios": []}
 
     owners: dict[str, tuple[str, bool]] = {}
+    # Wi-Fi devices whose radio address is not known yet still get a row.
+    unplaced: list[str] = []
     for entry in entries:
         config = {**entry.data, **entry.options}
+        if config.get(CONF_DEVICE_CID) or not config.get(CONF_HOST):
+            continue
         reserve = (config.get(CONF_BLE) or "").upper()
         if reserve:
             owners[reserve] = (entry.title, True)
         mac = arp.get(config.get(CONF_HOST) or "")
         if mac:
             owners.setdefault(_radio_address(mac), (entry.title, False))
+        elif not reserve:
+            unplaced.append(entry.title)
 
     radios = []
     seen = set()
@@ -297,19 +303,41 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
                 "reserve": reserve,
             }
         )
+    # Not heard now: a reserve is out of reach, any other device was never heard.
+    named = {radio["name"] for radio in radios}
     for address, (name, reserve) in owners.items():
-        if reserve and address not in seen:
-            radios.append(
-                {
-                    "address": address,
-                    "name": name,
-                    "advertised": None,
-                    "rssi": None,
-                    "in_range": False,
-                    "reserve": True,
-                }
-            )
-    radios.sort(key=lambda radio: (not radio["in_range"], -(radio["rssi"] or -999)))
+        if address in seen or (not reserve and name in named):
+            continue
+        named.add(name)
+        radios.append(
+            {
+                "address": address,
+                "name": name,
+                "advertised": None,
+                "rssi": None,
+                "in_range": False,
+                "reserve": reserve,
+            }
+        )
+    for name in unplaced:
+        radios.append(
+            {
+                "address": None,
+                "name": name,
+                "advertised": None,
+                "rssi": None,
+                "in_range": False,
+                "reserve": False,
+            }
+        )
+    radios.sort(
+        key=lambda radio: (
+            not radio["in_range"],
+            not radio["reserve"],
+            -(radio["rssi"] or -999),
+            (radio["name"] or "").lower(),
+        )
+    )
     return {"available": available, "radios": radios}
 
 

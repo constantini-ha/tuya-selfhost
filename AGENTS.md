@@ -621,3 +621,10 @@ contradicts your instinct, trust the note.
   one more (`notification-manager` skips the hide when the id matches). The network list
   copies one IP or MAC per tap (`button.copyable`); the "copy every MAC" button is gone.
   Hover colors sit under `@media (hover:hover)`: on a phone a tapped value stayed lit.
+- The Bluetooth tab lists every Wi-Fi device, not only radios heard: a device whose radio
+  was never heard (the fence energizer and the pump breaker, 11/2026: the Umbrel's only
+  adapter is its internal Intel one and hears nothing past -97 dBm) used to be missing, and
+  the owner read that as "not added". Never heard = "Not heard", reserve not heard = "Out of
+  reach", no ARP MAC yet = address "—"; sub-devices behind a gateway stay out.
+- `async_update_entry` on data or options reloads the entry (update listener in
+  `__init__`): the 2026.11.68 product-name backfill reloaded every entry once.

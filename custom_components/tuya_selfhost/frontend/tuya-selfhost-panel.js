@@ -1960,14 +1960,17 @@ class TuyaSelfhostPanel extends HTMLElement {
       row.innerHTML = `<div class="grow"><div class="name"></div>
         <div class="muted mono"></div><div class="muted advice"></div></div>`;
       row.querySelector(".name").textContent = radio.name || this._t("ble_unknown");
-      row.querySelector(".mono").textContent = radio.address +
+      row.querySelector(".mono").textContent = (radio.address || "—") +
         (radio.in_range ? " · " + radio.rssi + " dBm" : "") +
         (!radio.name && radio.advertised ? " · " + radio.advertised : "");
       const advice = row.querySelector(".advice");
       if (radio.reserve) advice.textContent = this._t("ble_reserve");
       else if (!radio.name) advice.textContent = this._t("ble_unknown_help");
+      else if (!radio.in_range) advice.textContent = this._t("ble_unheard_help");
       else advice.remove();
-      const [label, tone] = radio.in_range ? this._signal(radio.rssi) : ["ble_away", ""];
+      const [label, tone] = radio.in_range
+        ? this._signal(radio.rssi)
+        : [radio.reserve ? "ble_away" : "ble_unheard", ""];
       const pill = document.createElement("span");
       pill.className = "pill " + tone;
       pill.textContent = this._t(label);
