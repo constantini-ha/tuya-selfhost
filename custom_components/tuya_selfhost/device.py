@@ -16,6 +16,7 @@ from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
     CONF_BLE,
@@ -670,8 +671,18 @@ class TuyaLocalDevice(object):
             lambda: self._set_values(pending_properties),
             "Failed to update device state.",
         )
-        if result is _UNREACHABLE and self._api_standby is not None:
-            await self._send_over_reserve(pending_properties)
+        if result is not _UNREACHABLE:
+            return
+        if self._api_standby is not None and await self._send_over_reserve(
+            pending_properties
+        ):
+            return
+        # A command dropped in silence makes the key flip back on its own.
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="not_answering",
+            translation_placeholders={"name": self.name},
+        )
 
     def _set_values(self, properties):
         try:
@@ -802,6 +813,9 @@ class TuyaLocalDevice(object):
                 if self._api.parent:
                     self._api.parent.set_socketPersistent(False)
 
+                if i + 1 < connections and not auto:
+                    # The Tuya app on the LAN can hold the device for a second; spaced tries outlast it.
+                    await asyncio.sleep(min(i + 1, 2))
                 if i + 1 == connections:
                     self._reset_cached_state()
                     self._api_working_protocol_failures += 1

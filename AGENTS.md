@@ -628,3 +628,11 @@ contradicts your instinct, trust the note.
   reach", no ARP MAC yet = address "—"; sub-devices behind a gateway stay out.
 - `async_update_entry` on data or options reloads the entry (update listener in
   `__init__`): the 2026.11.68 product-name backfill reloaded every entry once.
+- With the devices' internet blocked, the Tuya app on the phone controls them over the
+  LAN and competes with Home Assistant for the device's few local sessions (11/2026:
+  Varanda and the pump breaker refused HA for seconds while the owner used the app).
+  `_attempt_over_transport` now waits 1 s, then 2 s, between tries on a fixed protocol
+  (not while rotating in auto mode), and `_send_pending_updates` raises a translated
+  `HomeAssistantError` (`exceptions.not_answering`) when neither Wi-Fi nor the Bluetooth
+  reserve delivered: before, the command vanished and the key flipped back on its own.
+  `test_missing_translations` fails unless every language file has every key of en.json.

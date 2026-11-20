@@ -1542,5 +1542,10 @@
                 }
             }
         }
+    },
+    "exceptions": {
+        "not_answering": {
+            "message": "{name} no ha respost. Si l'app Tuya està oberta en algun mòbil de casa, tanca-la i torna-ho a provar."
+        }
     }
 }

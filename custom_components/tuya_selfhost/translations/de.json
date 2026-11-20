@@ -1542,5 +1542,10 @@
                 }
             }
         }
+    },
+    "exceptions": {
+        "not_answering": {
+            "message": "{name} hat nicht geantwortet. Wenn die Tuya-App auf einem Handy im Haus geöffnet ist, schließe sie und versuche es erneut."
+        }
     }
 }

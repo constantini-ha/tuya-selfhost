@@ -1574,5 +1574,10 @@
                 }
             }
         }
+    },
+    "exceptions": {
+        "not_answering": {
+            "message": "{name} não respondeu. Se o app Tuya estiver aberto em algum celular aqui de casa, feche e tente de novo."
+        }
     }
 }

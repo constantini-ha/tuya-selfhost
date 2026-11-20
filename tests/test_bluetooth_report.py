@@ -38,14 +38,19 @@ def test_every_wifi_device_gets_a_row():
         "10.0.0.4": "C4:82:E1:BC:A1:D1",
     }
     bluetooth = MagicMock()
-    bluetooth.async_discovered_service_info.return_value = [_heard("AA:00:00:00:00:02", -60)]
+    bluetooth.async_discovered_service_info.return_value = [
+        _heard("AA:00:00:00:00:02", -60)
+    ]
     bluetooth.async_scanner_count.return_value = 1
-    with patch.dict(
-        "sys.modules", {"homeassistant.components.bluetooth": bluetooth}
-    ), patch("homeassistant.components.bluetooth", bluetooth, create=True):
+    with (
+        patch.dict("sys.modules", {"homeassistant.components.bluetooth": bluetooth}),
+        patch("homeassistant.components.bluetooth", bluetooth, create=True),
+    ):
         report = _bluetooth_report(MagicMock(), entries, arp)
 
-    rows = [(r["name"], r["address"], r["in_range"], r["reserve"]) for r in report["radios"]]
+    rows = [
+        (r["name"], r["address"], r["in_range"], r["reserve"]) for r in report["radios"]
+    ]
     assert rows == [
         ("Near", "AA:00:00:00:00:02", True, True),
         ("Reserve away", "AA:00:00:00:00:04", False, True),

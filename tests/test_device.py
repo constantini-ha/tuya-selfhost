@@ -319,6 +319,33 @@ async def test_async_set_property_sends_to_api(subject, mock_api):
     mock_api().set_multiple_values.assert_called_once()
 
 
+async def test_command_that_never_arrives_is_reported(subject, mock_api, mocker):
+    from homeassistant.exceptions import HomeAssistantError
+
+    subject._protocol_configured = 3.4
+    sleep = mocker.patch(
+        "custom_components.tuya_selfhost.device.asyncio.sleep", new=mocker.AsyncMock()
+    )
+    mock_api().set_multiple_values.side_effect = Exception("Unable to Connect")
+    with pytest.raises(HomeAssistantError) as err:
+        await subject.async_set_property("1", True)
+    assert err.value.translation_key == "not_answering"
+    assert err.value.translation_placeholders == {"name": "Some name"}
+    assert mock_api().set_multiple_values.call_count == 3
+    assert [c.args[0] for c in sleep.await_args_list if c.args[0] >= 1] == [1, 2]
+
+
+async def test_command_after_a_busy_moment_still_arrives(subject, mock_api, mocker):
+    subject._protocol_configured = 3.4
+    mocker.patch(
+        "custom_components.tuya_selfhost.device.asyncio.sleep", new=mocker.AsyncMock()
+    )
+    mock_api().set_multiple_values.side_effect = [Exception("Unable to Connect"), None]
+    await subject.async_set_property("1", True)
+    assert mock_api().set_multiple_values.call_count == 2
+    assert subject.get_property("1") is True
+
+
 @pytest.mark.asyncio
 async def test_set_property_immediately_stores_pending_updates(subject):
     subject._cached_state = {"1": True}
