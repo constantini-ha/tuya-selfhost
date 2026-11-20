@@ -636,3 +636,7 @@ contradicts your instinct, trust the note.
   `HomeAssistantError` (`exceptions.not_answering`) when neither Wi-Fi nor the Bluetooth
   reserve delivered: before, the command vanished and the key flipped back on its own.
   `test_missing_translations` fails unless every language file has every key of en.json.
+- Save in the automation and scene editors takes what is filled in an open picker or
+  adder as if Add had been pressed (`pickedClause`, `addedTask`/`takeAddedTask`, the same
+  functions the Add buttons use). The owner filled 17:00 and "Cerca → Ligar", pressed Save
+  and got "Add at least one thing under When": Add per block is not obvious on a phone.

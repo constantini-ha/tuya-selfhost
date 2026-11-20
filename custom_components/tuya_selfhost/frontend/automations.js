@@ -4,7 +4,7 @@
  *  it keeps running with the panel closed and stays editable in Home Assistant.
  */
 
-import { decode, encode, slug } from "./scenes.js";
+import { decode, encode, slug, takeAddedTask } from "./scenes.js";
 
 export const AUTO_PREFIX = "tuya_auto_";
 const WATCHED = ["switch", "light", "fan"];
@@ -27,6 +27,21 @@ export const AUTO_CSS = `
 `;
 
 const clock = (text) => String(text || "").slice(0, 5);
+const HHMM = /^\d\d:\d\d$/;
+
+// The clause an open picker holds, or null while it is not complete.
+function pickedClause(picking) {
+  if (!picking) return null;
+  if (picking.kind === "time") {
+    if (picking.list === "triggers") return HHMM.test(picking.at || "") ? { kind: "time", at: picking.at } : null;
+    return HHMM.test(picking.after || "") && HHMM.test(picking.before || "") &&
+      picking.after !== picking.before
+      ? { kind: "time", after: picking.after, before: picking.before }
+      : null;
+  }
+  return picking.entity ? { kind: "state", entity: picking.entity, to: picking.to || "on" } : null;
+}
+
 const one = (value) => (Array.isArray(value) ? (value.length === 1 ? value[0] : null) : value);
 
 function decodeTrigger(raw) {
@@ -188,6 +203,13 @@ export const AutomationMethods = {
 
   async _saveAuto() {
     const draft = this._auto;
+    // What is filled in but not yet added counts, as if Add had been pressed.
+    const clause = pickedClause(draft.picking);
+    if (clause) {
+      draft[draft.picking.list].push(clause);
+      draft.picking = null;
+    }
+    takeAddedTask(draft);
     const name = draft.name.trim();
     const missing = !name ? "auto_need_name"
       : !draft.triggers.length ? "auto_need_when"
@@ -339,7 +361,8 @@ export const AutomationMethods = {
       if (when) {
         box.appendChild(time(this._t("auto_pick_time"), "at"));
         add.addEventListener("click", () => {
-          if (/^\d\d:\d\d$/.test(picking.at)) done({ kind: "time", at: picking.at });
+          const clause = pickedClause(picking);
+          if (clause) done(clause);
         });
       } else {
         const times = document.createElement("div");
@@ -349,10 +372,8 @@ export const AutomationMethods = {
         times.append(time(this._t("auto_from"), "after"), dash, time(this._t("auto_to"), "before"));
         box.appendChild(times);
         add.addEventListener("click", () => {
-          if (/^\d\d:\d\d$/.test(picking.after) && /^\d\d:\d\d$/.test(picking.before) &&
-              picking.after !== picking.before) {
-            done({ kind: "time", after: picking.after, before: picking.before });
-          }
+          const clause = pickedClause(picking);
+          if (clause) done(clause);
         });
       }
     } else {
@@ -377,8 +398,7 @@ export const AutomationMethods = {
           ["on", "off"].map((to) => [to, this._t(prefix + to)]),
           picking.to, (value) => { picking.to = value; })
       );
-      add.addEventListener("click", () =>
-        done({ kind: "state", entity: picking.entity, to: picking.to }));
+      add.addEventListener("click", () => done(pickedClause(picking)));
     }
     buttons.append(add, cancel);
     box.appendChild(buttons);

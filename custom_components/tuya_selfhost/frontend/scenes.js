@@ -6,6 +6,23 @@
  */
 
 export const SCENE_PREFIX = "tuya_scene_";
+
+// The task an open adder holds, or null while it is not complete; Save takes it as Add would.
+export function addedTask(adding) {
+  if (!adding) return null;
+  if (adding.kind === "wait") {
+    const seconds = Math.round(Number(adding.seconds));
+    return seconds >= 1 && seconds <= 3600 ? { kind: "wait", seconds } : null;
+  }
+  return adding.entity && adding.act ? { kind: "do", entity: adding.entity, act: adding.act } : null;
+}
+
+export function takeAddedTask(draft) {
+  const task = addedTask(draft.adding);
+  if (!task) return;
+  draft.tasks.push(task);
+  draft.adding = null;
+}
 const ENTITY_PREFIX = "script." + SCENE_PREFIX;
 
 const SCENE_ICONS = [
@@ -214,6 +231,7 @@ export const SceneMethods = {
 
   async _saveScene() {
     const draft = this._scene;
+    takeAddedTask(draft);
     const name = draft.name.trim();
     if (!name || !draft.tasks.length) {
       draft.error = this._t(name ? "scene_need_task" : "scene_need_name");
@@ -453,8 +471,8 @@ export const SceneMethods = {
       label.textContent = this._t("scene_wait_seconds");
       box.append(label, input);
       add.addEventListener("click", () => {
-        const seconds = Math.round(Number(adding.seconds));
-        if (seconds >= 1 && seconds <= 3600) finish({ kind: "wait", seconds });
+        const task = addedTask(adding);
+        if (task) finish(task);
       });
     } else {
       const targets = this._sceneTargets();
@@ -478,8 +496,7 @@ export const SceneMethods = {
         select(this._t("scene_pick_act"), acts.map((act) => [act, this._t("scene_act_" + act)]),
           adding.act, (value) => { adding.act = value; })
       );
-      add.addEventListener("click", () =>
-        finish({ kind: "do", entity: adding.entity, act: adding.act }));
+      add.addEventListener("click", () => finish(addedTask(adding)));
     }
     buttons.append(add, cancel);
     box.appendChild(buttons);
