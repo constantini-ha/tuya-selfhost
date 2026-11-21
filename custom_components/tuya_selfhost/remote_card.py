@@ -1,11 +1,14 @@
 """Serves the remote builder card and stores the button layouts it draws."""
 
+import base64
+import binascii
 import logging
 from pathlib import Path
 
 import voluptuous as vol
 from homeassistant.components import panel_custom, websocket_api
 from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.remote import DATA_COMPONENT as REMOTES
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -73,7 +76,39 @@ async def async_setup_remote_card(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_layout_entities)
     websocket_api.async_register_command(hass, websocket_get_layout)
     websocket_api.async_register_command(hass, websocket_set_layout)
+    websocket_api.async_register_command(hass, websocket_save_codes)
     _LOGGER.debug("Remote builder card served from %s", FRONTEND_URL)
+
+
+def _code(value):
+    if value.startswith("rf:"):
+        return value
+    try:
+        base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as err:
+        raise vol.Invalid("not a base64 IR code") from err
+    return value
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/remote/save_codes",
+        vol.Required("entity_id"): str,
+        vol.Required("device"): str,
+        vol.Required("codes"): {str: vol.All(str, _code)},
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def websocket_save_codes(hass, connection, msg):
+    """Keep codes made elsewhere (from the remote's protocol, say) as learned ones are."""
+    component = hass.data.get(REMOTES)
+    remote = component.get_entity(msg["entity_id"]) if component else None
+    if remote is None or not hasattr(remote, "async_save_codes"):
+        connection.send_error(msg["id"], "not_found", "No Tuya Selfhost remote with that id")
+        return
+    await remote.async_save_codes(msg["device"], msg["codes"])
+    connection.send_result(msg["id"], {"saved": sorted(msg["codes"])})
 
 
 @websocket_api.websocket_command(

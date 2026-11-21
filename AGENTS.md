@@ -236,6 +236,21 @@ contradicts your instinct, trust the note.
   `ValueError` when a platform has no entities, so `button.py` checks the device
   config before calling it.
 
+- Codes made instead of learned (2026.11.77): `tuya_selfhost/remote/save_codes`
+  (admin; `entity_id`, `device`, `codes: {name: code}`) keeps them in the remote's
+  code store as if learned (`TuyaLocalRemote.async_save_codes`), so a layout key
+  can name them. A key's `command` must stay a short name: it is part of the button
+  entity's unique id. `send_command` also takes a raw `b64:<code>` for one-off tests.
+- Learned IR codes are base64 of little-endian uint16 durations in microseconds,
+  mark first. The owner's AC remote is TCL112 (TCL and rebrands): header about
+  3000/1600, bit mark 500, one 1080, zero 320, 14 bytes LSB first, sent as a
+  special frame (type 2, kept as learned) then the state frame (type 1). State byte 5
+  bit 2 is power, byte 6 the mode (3 = cool), byte 7 the temperature as 31 minus the
+  degrees, byte 13 the sum of bytes 0-12. Learning 22 °C was enough to make 16-25:
+  the 20 °C made from it matched, byte for byte, the "Ligar" code learned from the
+  real remote. Change only the spaces of the bits that differ and keep the learned
+  timings, so the code still looks like the remote's own.
+
 ### Home Assistant traps that cost real debugging time
 
 - **`has_returned_state` means "ever", not "still".** It reads the cached

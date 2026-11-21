@@ -135,6 +135,13 @@ class TuyaLocalRemote(TuyaLocalEntity, RemoteEntity):
         self._lock = asyncio.Lock()
         self._attr_is_on = True
 
+    async def async_save_codes(self, subdevice: str, codes: dict[str, str]) -> None:
+        """Keep ready-made codes under these names, as learned ones are kept."""
+        if not self._storage_loaded:
+            await self._async_load_storage()
+        self._codes.setdefault(subdevice, {}).update(codes)
+        await self._code_storage.async_save(self._codes)
+
     async def _async_load_storage(self):
         """Load stored codes and flags from disk."""
         self._codes.update(await self._code_storage.async_load() or {})

@@ -359,6 +359,19 @@ class TestAsyncDeleteCommand:
         assert "power" not in remote._codes.get("tv", {})
 
 
+class TestAsyncSaveCodes:
+    @pytest.mark.asyncio
+    async def test_ready_made_codes_join_the_learned_ones(self):
+        remote = _make_remote()
+        remote._code_storage.async_load = AsyncMock(
+            return_value={"ac": {"cool_22": "CODE22"}}
+        )
+        await remote.async_save_codes("ac", {"cool_23": "CODE23"})
+        assert remote._codes == {"ac": {"cool_22": "CODE22", "cool_23": "CODE23"}}
+        remote._code_storage.async_save.assert_awaited_once_with(remote._codes)
+        assert remote._extract_codes(["cool_23"], subdevice="ac") == [["CODE23"]]
+
+
 class TestAsyncLearnCommand:
     @pytest.mark.asyncio
     async def test_learn_ir_command(self):
