@@ -32,6 +32,7 @@ from .device import async_delete_device, get_device_id, setup_device
 from .helpers.device_config import get_config
 from .helpers.discovery import async_start_discovery, async_stop_discovery
 from .ble.reserve import async_start_radios, async_stop_radios
+from .notices import async_start_notices, async_stop_notices
 from .remote_card import async_setup_remote_card
 from .cloud import async_restore_auth
 from .cloud_api import async_setup_cloud_api
@@ -1013,6 +1014,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await async_setup_remote_card(hass)
     await async_restore_auth(hass)
     await async_setup_cloud_api(hass)
+    await async_start_notices(hass)
     # Before the device is built: it picks up a Bluetooth reserve learned earlier.
     await async_start_radios(hass)
     config = {**entry.data, **entry.options, "name": entry.title}
@@ -1090,6 +1092,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     if not remaining:
         async_stop_discovery(hass)
         async_stop_radios(hass)
+        async_stop_notices(hass)
 
     return True
 

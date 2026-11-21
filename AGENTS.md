@@ -418,6 +418,23 @@ contradicts your instinct, trust the note.
   panel entity id or a Zigbee IEEE in it, because `search/related` misses a
   `zha_event` trigger. Those open with their steps as `raw`, so saving keeps them
   intact; a `zha_event` trigger is shown as "<button> is pressed".
+- Each run gives a notice (`notices.py`, from 2026.11.74): a persistent
+  notification in Home Assistant (one per automation, `tuya_selfhost_<id>`, the
+  newest replaces the last) and a push to the phones with the Home Assistant app
+  (`notify.mobile_app_*`, same `tag`, tap opens the panel). It listens to
+  `automation_triggered`, which fires only after the conditions passed, then reads
+  the run's trace (`trace.util.async_list_contexts` / `async_get_trace`, keyed by the
+  event's context) until it stops, so the notice says done, failed with the error
+  (our `not_answering` text) or stopped. A `cancelled` run (restart mode) stays
+  quiet: the run that replaced it gives the notice. No trace within 5 s (traces
+  off) and the notice only says it ran.
+- The choice lives in a store (`tuya_selfhost.automation_notices`), not in the
+  automation config: `tuya_auto_*` notify unless turned off, automations made
+  elsewhere only when turned on there. `phones: null` means every phone, so a
+  phone added later gets them too; the editor sends `null` when all are ticked.
+  Websocket: `tuya_selfhost/notice/get` and `/set` (admin). Saving the notice
+  happens after the automation is saved and its failure is ignored, or a retry
+  would create the automation twice.
 
 ### Bluetooth
 

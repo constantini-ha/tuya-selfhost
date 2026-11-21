@@ -24,6 +24,9 @@ export const AUTO_CSS = `
 .clause + .clause { border-top:1px solid var(--divider-color) }
 .clause ha-icon { --mdc-icon-size:22px; flex:none; color:var(--secondary-text-color) }
 .times { display:flex; align-items:center; gap:10px }
+.check { display:flex; align-items:center; gap:10px; min-height:40px; cursor:pointer }
+.check input { width:18px; height:18px; margin:0; accent-color:var(--primary-color) }
+.check.phone, .muted.phone { padding-left:28px }
 `;
 
 const clock = (text) => String(text || "").slice(0, 5);
@@ -159,8 +162,36 @@ export const AutomationMethods = {
 
   _newAuto() {
     this._auto = { id: null, name: "", triggers: [], conditions: [], tasks: [], adding: null,
-      picking: null };
+      picking: null, notice: null };
     this._render();
+    this._loadNotice(null);
+  },
+
+  async _loadNotice(id) {
+    const draft = this._auto;
+    try {
+      const reply = await this._hass.callWS({ type: "tuya_selfhost/notice/get", automation_id: id });
+      if (this._auto !== draft) return;
+      const chosen = reply.phones || reply.available.map((phone) => phone.id);
+      draft.notice = { on: reply.on, available: reply.available, chosen: new Set(chosen) };
+      this._render();
+    } catch (err) {
+      // An integration without notices: the editor works as before.
+    }
+  },
+
+  async _saveNotice(draft, id) {
+    const notice = draft.notice;
+    if (!notice) return;
+    const ids = notice.available.map((phone) => phone.id);
+    const chosen = ids.filter((phone) => notice.chosen.has(phone));
+    await this._hass.callWS({
+      type: "tuya_selfhost/notice/set",
+      automation_id: id,
+      on: notice.on,
+      // Every phone stays "all", so a phone added later gets the notices too.
+      phones: chosen.length === ids.length ? null : chosen,
+    });
   },
 
   async _editAuto(entityId) {
@@ -177,11 +208,13 @@ export const AutomationMethods = {
         keep: config,
         adding: null,
         picking: null,
+        notice: null,
       };
     } catch (err) {
       this._flash = this._t("scene_failed", { err: this._errText(err) });
     }
     this._render();
+    if (this._auto) this._loadNotice(this._auto.id);
   },
 
   _freshAutoId(name) {
@@ -239,6 +272,11 @@ export const AutomationMethods = {
       draft.error = this._t("scene_failed", { err: this._errText(err) });
       this._render();
       return;
+    }
+    try {
+      await this._saveNotice(draft, id);
+    } catch (err) {
+      // The automation is saved; its notice keeps the default.
     }
     await this._waitForAuto(id, true);
     this._auto = null;
@@ -457,6 +495,48 @@ export const AutomationMethods = {
     pad.appendChild(part);
   },
 
+  _check(label, checked, onChange) {
+    const row = document.createElement("label");
+    row.className = "check";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = checked;
+    box.addEventListener("change", () => onChange(box.checked));
+    row.append(box, label);
+    return row;
+  },
+
+  _noticePart(notice) {
+    const part = document.createElement("div");
+    part.className = "part";
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = this._t("auto_notice");
+    const help = document.createElement("div");
+    help.className = "muted";
+    help.textContent = this._t("auto_notice_help");
+    part.append(title, help, this._check(this._t("auto_notice_on"), notice.on, (on) => {
+      notice.on = on;
+      this._render();
+    }));
+    if (!notice.on) return part;
+    for (const phone of notice.available) {
+      const row = this._check(phone.name, notice.chosen.has(phone.id), (on) => {
+        if (on) notice.chosen.add(phone.id);
+        else notice.chosen.delete(phone.id);
+      });
+      row.classList.add("phone");
+      part.appendChild(row);
+    }
+    if (!notice.available.length) {
+      const none = document.createElement("div");
+      none.className = "muted phone";
+      none.textContent = this._t("auto_notice_no_phone");
+      part.appendChild(none);
+    }
+    return part;
+  },
+
   _renderAuto() {
     const draft = this._auto;
     const card = document.createElement("ha-card");
@@ -494,6 +574,7 @@ export const AutomationMethods = {
     then.append(title, help);
     this._taskRows(draft, then);
     pad.appendChild(then);
+    if (draft.notice) pad.appendChild(this._noticePart(draft.notice));
 
     if (draft.error) {
       const error = document.createElement("div");
