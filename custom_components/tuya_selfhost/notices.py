@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
-from urllib.parse import quote
 
 import voluptuous as vol
 
@@ -158,7 +157,7 @@ class Notices:
             return
         message = notice_text(self.hass.config.language, execution, error)
         tag = f"{DOMAIN}_{automation_id}"
-        url = f"{PANEL_PATH}?automation={quote(automation_id)}"
+        url = f"{PANEL_PATH}?notifications"
         persistent_notification.async_create(
             self.hass, message, title=name, notification_id=tag
         )
