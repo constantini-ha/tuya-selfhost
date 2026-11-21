@@ -421,7 +421,9 @@ contradicts your instinct, trust the note.
 - Each run gives a notice (`notices.py`, from 2026.11.74): a persistent
   notification in Home Assistant (one per automation, `tuya_selfhost_<id>`, the
   newest replaces the last) and a push to the phones with the Home Assistant app
-  (`notify.mobile_app_*`, same `tag`, tap opens the panel). It listens to
+  (`notify.mobile_app_*`, same `tag`). Tapping it opens that automation in the
+  panel: `/tuya-selfhost?automation=<id>`, read by `_openFromUrl` on boot and on
+  `location-changed` (the app may already be on the panel), then cleared from the URL. It listens to
   `automation_triggered`, which fires only after the conditions passed, then reads
   the run's trace (`trace.util.async_list_contexts` / `async_get_trace`, keyed by the
   event's context) until it stops, so the notice says done, failed with the error

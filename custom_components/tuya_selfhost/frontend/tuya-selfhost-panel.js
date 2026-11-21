@@ -313,6 +313,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
     this._watch();
     this._watchEntries();
+    this._openFromUrl();
   }
 
   // A device added or removed anywhere (this tab, the form, another screen) shows up here.
@@ -375,10 +376,27 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    this._onLocation = () => this._openFromUrl();
+    window.addEventListener("location-changed", this._onLocation);
     if (!this._ready) return;
     this._watch();
     this._watchEntries();
     this._refreshEntries();
+    this._openFromUrl();
+  }
+
+  // A notice tapped on the phone opens its automation: /tuya-selfhost?automation=<id>.
+  _openFromUrl() {
+    if (!this._entries) return;
+    const id = new URLSearchParams(location.search).get("automation");
+    if (!id) return;
+    history.replaceState(history.state, "", location.pathname);
+    const entityId = Object.keys(this._hass.states).find((key) =>
+      key.startsWith("automation.") && this._hass.states[key].attributes.id === id);
+    Object.assign(this, { _scenes: true, _scene: null, _auto: null, _config: null, _open: null,
+      _remote: null, _renaming: null });
+    if (entityId) this._editAuto(entityId);
+    else this._render();
   }
 
   async _loadZigbee() {
@@ -1012,6 +1030,7 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener("location-changed", this._onLocation);
     if (this._unwatch) {
       this._unwatch();
       this._unwatch = null;

@@ -84,6 +84,7 @@ async def test_a_run_notifies_home_assistant_and_every_phone(hass):
         "mobile_app_iphone_ana",
     ]
     assert calls[0][1]["data"]["tag"] == "tuya_selfhost_tuya_auto_lamp"
+    assert calls[0][1]["data"]["url"] == "/tuya-selfhost?automation=tuya_auto_lamp"
 
 
 async def test_only_the_chosen_phones_get_it(hass):
