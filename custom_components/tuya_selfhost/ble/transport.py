@@ -13,12 +13,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components import bluetooth as ha_bluetooth
 
 from .discovery import uuid_from_advertisement
+from .reserve import known_uuid, remember_uuid
 from .manager import AbstaractTuyaBLEDeviceManager, TuyaBLEDeviceCredentials
 from .tuya_ble import TuyaBLEDataPoint, TuyaBLEDataPointType, TuyaBLEDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-CALL_TIMEOUT = 30
+CALL_TIMEOUT = 60
+# A faint radio is only heard now and then; this long it may stay silent before a command gives up.
+HEAR_TIMEOUT = 20
 RECEIVE_TIMEOUT = 5
 STATUS_SETTLE_STEPS = 20
 
@@ -70,11 +73,15 @@ class TuyaBleTransport:
 
     def _credentials(self, service_info) -> TuyaBLEDeviceCredentials:
         """Build credentials, taking the uuid from what the device broadcasts."""
-        uuid = uuid_from_advertisement(service_info)
+        # The uuid rides in the scan response, which a faint radio rarely gets through.
+        uuid = uuid_from_advertisement(service_info) or known_uuid(
+            self._hass, self._address
+        )
         if not uuid:
             raise ConnectionError(
-                f"{self._address} does not broadcast a readable uuid"
+                f"{self._address} has not broadcast its uuid clearly yet"
             )
+        remember_uuid(self._hass, self._address, uuid)
         return TuyaBLEDeviceCredentials(
             uuid=uuid,
             local_key=self._local_key,
@@ -111,6 +118,24 @@ class TuyaBleTransport:
         ble_device = bluetooth.async_ble_device_from_address(
             self._hass, self._address, connectable=True
         )
+        if ble_device is None:
+            try:
+                await bluetooth.async_process_advertisements(
+                    self._hass,
+                    lambda _info: True,
+                    bluetooth.BluetoothCallbackMatcher(
+                        address=self._address, connectable=True
+                    ),
+                    bluetooth.BluetoothScanningMode.ACTIVE,
+                    HEAR_TIMEOUT,
+                )
+            except TimeoutError as err:
+                raise ConnectionError(
+                    f"{self._address} is out of Bluetooth range"
+                ) from err
+            ble_device = bluetooth.async_ble_device_from_address(
+                self._hass, self._address, connectable=True
+            )
         if ble_device is None:
             raise ConnectionError(f"{self._address} is out of Bluetooth range")
         service_info = ha_bluetooth.async_last_service_info(

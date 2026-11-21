@@ -4,6 +4,9 @@
     "codeowners": [
         "@Constantini21"
     ],
+    "after_dependencies": [
+        "bluetooth"
+    ],
     "config_flow": true,
     "dependencies": [
         "bluetooth_adapters",
@@ -24,5 +27,5 @@
         "tuya-device-sharing-sdk~=0.2.4",
         "segno==1.6.6"
     ],
-    "version": "2026.11.72"
+    "version": "2026.11.73"
 }

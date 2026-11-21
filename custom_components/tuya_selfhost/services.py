@@ -17,7 +17,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import service
 
-from .ble.autodetect import _radio_address
+from .ble.discovery import uuid_from_advertisement
+from .ble.reserve import DATA as RADIOS
+from .ble.reserve import radio_address
 from .const import CONF_BLE, CONF_DEVICE_CID, CONF_DEVICE_ID, DOMAIN
 from .device import get_device_id
 from .helpers.arp import arp_table
@@ -264,6 +266,9 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
     except Exception:  # no Bluetooth integration, or none set up
         return {"available": False, "radios": []}
 
+    learned = hass.data.get(RADIOS)
+    learned_reserves = learned.reserves if learned else {}
+    uuids = learned.uuids if learned else {}
     owners: dict[str, tuple[str, bool]] = {}
     # Wi-Fi devices whose radio address is not known yet still get a row.
     unplaced: list[str] = []
@@ -271,12 +276,16 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
         config = {**entry.data, **entry.options}
         if config.get(CONF_DEVICE_CID) or not config.get(CONF_HOST):
             continue
-        reserve = (config.get(CONF_BLE) or "").upper()
+        reserve = (
+            config.get(CONF_BLE)
+            or learned_reserves.get(config.get(CONF_DEVICE_ID))
+            or ""
+        ).upper()
         if reserve:
             owners[reserve] = (entry.title, True)
         mac = arp.get(config.get(CONF_HOST) or "")
         if mac:
-            owners.setdefault(_radio_address(mac), (entry.title, False))
+            owners.setdefault(radio_address(mac), (entry.title, False))
         elif not reserve:
             unplaced.append(entry.title)
 
@@ -301,6 +310,8 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
                 "rssi": info.rssi,
                 "in_range": True,
                 "reserve": reserve,
+                # Bluetooth needs the uuid from the scan response, heard clearly at least once.
+                "ready": address in uuids or uuid_from_advertisement(info) is not None,
             }
         )
     # Not heard now: a reserve is out of reach, any other device was never heard.
@@ -317,6 +328,7 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
                 "rssi": None,
                 "in_range": False,
                 "reserve": reserve,
+                "ready": address in uuids,
             }
         )
     for name in unplaced:
@@ -328,6 +340,7 @@ def _bluetooth_report(hass: HomeAssistant, entries, arp: dict) -> dict:
                 "rssi": None,
                 "in_range": False,
                 "reserve": False,
+                "ready": False,
             }
         )
     radios.sort(

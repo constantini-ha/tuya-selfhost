@@ -8,7 +8,6 @@ https://github.com/codetheweb/tuyapi/issues/31.
 """
 
 import logging
-from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
@@ -18,10 +17,6 @@ from homeassistant.helpers.entity_registry import (
     async_get as async_get_entity_registry,
 )
 from homeassistant.helpers.entity_registry import async_migrate_entries
-from homeassistant.helpers.event import (
-    async_call_later,
-    async_track_time_interval,
-)
 from homeassistant.util import slugify
 
 from .const import (
@@ -36,7 +31,7 @@ from .const import (
 from .device import async_delete_device, get_device_id, setup_device
 from .helpers.device_config import get_config
 from .helpers.discovery import async_start_discovery, async_stop_discovery
-from .ble.autodetect import async_detect_reserve
+from .ble.reserve import async_start_radios, async_stop_radios
 from .remote_card import async_setup_remote_card
 from .cloud import async_restore_auth
 from .cloud_api import async_setup_cloud_api
@@ -1018,6 +1013,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await async_setup_remote_card(hass)
     await async_restore_auth(hass)
     await async_setup_cloud_api(hass)
+    # Before the device is built: it picks up a Bluetooth reserve learned earlier.
+    await async_start_radios(hass)
     config = {**entry.data, **entry.options, "name": entry.title}
     try:
         device = await hass.async_add_executor_job(setup_device, hass, config)
@@ -1051,17 +1048,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await async_setup_services(hass, entities)
 
     entry.add_update_listener(async_update_entry)
-
-    # Give Bluetooth discovery a moment to populate, then look for this
-    # device's radio; repeat, because what is in range changes.
-    @callback
-    def _look_for_radio(_now=None):
-        entry.async_create_task(hass, async_detect_reserve(hass, entry))
-
-    entry.async_on_unload(async_call_later(hass, 90, _look_for_radio))
-    entry.async_on_unload(
-        async_track_time_interval(hass, _look_for_radio, timedelta(hours=6))
-    )
 
     return True
 
@@ -1103,6 +1089,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     ]
     if not remaining:
         async_stop_discovery(hass)
+        async_stop_radios(hass)
 
     return True
 

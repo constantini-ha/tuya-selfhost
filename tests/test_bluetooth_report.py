@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 from custom_components.tuya_selfhost.services import _bluetooth_report
 
 
-def _entry(title, host, ble=None, cid=None):
-    data = {"host": host}
+def _entry(title, host, ble=None, cid=None, device_id=None):
+    data = {"host": host, "device_id": device_id or title}
     if cid:
         data["device_cid"] = cid
     return SimpleNamespace(title=title, data=data, options={"ble": ble} if ble else {})
@@ -46,7 +46,7 @@ def test_every_wifi_device_gets_a_row():
         patch.dict("sys.modules", {"homeassistant.components.bluetooth": bluetooth}),
         patch("homeassistant.components.bluetooth", bluetooth, create=True),
     ):
-        report = _bluetooth_report(MagicMock(), entries, arp)
+        report = _bluetooth_report(SimpleNamespace(data={}), entries, arp)
 
     rows = [
         (r["name"], r["address"], r["in_range"], r["reserve"]) for r in report["radios"]
@@ -57,3 +57,29 @@ def test_every_wifi_device_gets_a_row():
         ("Fence", "C4:82:E1:BC:A1:D2", False, False),
         ("No mac yet", None, False, False),
     ]
+
+
+def test_a_learned_reserve_shows_whether_it_can_be_used_yet():
+    entries = [_entry("Fence", "10.0.0.4", device_id="fence")]
+    arp = {}
+    learned = SimpleNamespace(reserves={"fence": "C4:82:E1:BC:A1:D2"}, uuids={})
+    bluetooth = MagicMock()
+    bluetooth.async_discovered_service_info.return_value = [
+        _heard("C4:82:E1:BC:A1:D2", -92)
+    ]
+    bluetooth.async_scanner_count.return_value = 1
+    hass = SimpleNamespace(data={"tuya_selfhost_radios": learned})
+    with (
+        patch.dict("sys.modules", {"homeassistant.components.bluetooth": bluetooth}),
+        patch("homeassistant.components.bluetooth", bluetooth, create=True),
+    ):
+        waiting = _bluetooth_report(hass, entries, arp)["radios"][0]
+        learned.uuids["C4:82:E1:BC:A1:D2"] = "tuya5f0b9a3e21c4"
+        ready = _bluetooth_report(hass, entries, arp)["radios"][0]
+
+    assert (waiting["name"], waiting["reserve"], waiting["ready"]) == (
+        "Fence",
+        True,
+        False,
+    )
+    assert ready["ready"] is True

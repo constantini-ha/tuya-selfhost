@@ -257,7 +257,7 @@ contradicts your instinct, trust the note.
 - **Mark dispatcher and timer handlers with `@callback`.** Without it Home
   Assistant runs them in a `SyncWorker` thread and any `async_create_task` from
   there raises `RuntimeError: ... from a thread other than the event loop`. This
-  has bitten this integration twice: `async_detect_reserve` and
+  has bitten this integration twice: the old `async_detect_reserve` and
   `remote_keys._schedule`.
 - **`suggested_object_id` is only a base.** Home Assistant prefixes it with the
   area and the device, so `tuya_remote_ar_da_sala_frio_22` becomes
@@ -452,6 +452,22 @@ contradicts your instinct, trust the note.
   device to be fine and the integration to be the one at fault.
 
 
+- **The reserve is automatic** (`ble/reserve.py`, from 2026.11.73). Every 10 minutes ARP
+  says which radio each Wi-Fi device should have (MAC plus one); one Bluetooth callback on
+  service data `a201` adopts it the moment it is heard, attaches it to the running device
+  (`attach_reserve`) and keeps it in the store `tuya_selfhost.ble_radios`. The device reads
+  it back at start (`reserve_address`). It used to be a check 90 s after setup and every 6 h
+  that wrote `ble` into the entry options: a radio heard only now and then (the owner's
+  fence at −92 dBm, heard once) was never caught, and writing options reloads the entry,
+  which would cut a command in flight. A `ble` typed in the options still wins.
+- **The uuid is kept the one time it gets through.** It rides in the scan response, which
+  a faint radio rarely delivers (the fence's adverts came with service data and no
+  manufacturer data while every nearer Tuya radio had both). The store keeps it per
+  address and `TuyaBleTransport._credentials` falls back to it; the report's `ready` says
+  whether it is known, and the panel says the reserve still waits for it.
+- A command on a reserve whose radio is not in Home Assistant's list waits up to
+  `HEAR_TIMEOUT` (20 s) for an advertisement before calling it out of range; `CALL_TIMEOUT`
+  went to 60 s to leave room for that and the connection.
 - Tuya combo modules advertise service `0000a201` at **the Wi-Fi MAC plus one**.
 - The uuid is in the advertisement; `key = md5(service_data[1:])`, then AES-128-CBC
   (key used as iv) over `manufacturer_data[6:]`. `service_data[0]` is 0 for a
@@ -467,8 +483,8 @@ contradicts your instinct, trust the note.
   `network_report` answers `bluetooth: {available, radios}` from
   `bluetooth.async_discovered_service_info(hass, connectable=False)`: anything
   advertising a201/fd50 or manufacturer 0x07D0, plus any address a configured
-  device owns (its stored reserve, or Wi-Fi MAC plus one from the ARP table). A
-  stored reserve that is not heard is listed as out of reach.
+  device owns (its reserve, typed or learned, or Wi-Fi MAC plus one from the ARP table). A
+  reserve that is not heard is listed as out of reach.
 
 - The sign-in block shows "Open Smart Life" (`smartlife://`) and "Open Tuya"
   (`tuyasmart://`) links on phones only, by user agent. A web page cannot tell

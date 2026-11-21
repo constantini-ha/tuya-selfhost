@@ -4,6 +4,7 @@ API for Tuya Local devices.
 
 import asyncio
 import logging
+from functools import partial
 from asyncio.exceptions import CancelledError
 from threading import Lock
 from time import time
@@ -30,6 +31,7 @@ from .const import (
     CONF_PROTOCOL_VERSION,
     DOMAIN,
 )
+from .ble.reserve import reserve_address
 from .helpers.config import get_device_id
 from .helpers.device_config import possible_matches
 from .helpers.log import log_json
@@ -95,6 +97,7 @@ class TuyaLocalDevice(object):
         self._api_protocol_version_index = None
         self._api_protocol_working = False
         self._api_standby = None
+        self._new_reserve = None
         self._api_working_protocol_failures = 0
         self.dev_cid = dev_cid
         try:
@@ -130,10 +133,12 @@ class TuyaLocalDevice(object):
                 else:
                     self._api = tinytuya.Device(dev_id, address, local_key)
                     self._api_lock = asyncio.Lock()
-                    if ble:
-                        self._api_standby = _ble_transport(
-                            hass, dev_id, local_key, ble
-                        )
+                    self._new_reserve = partial(
+                        _ble_transport, hass, dev_id, local_key
+                    )
+                    standby = ble or reserve_address(hass, dev_id)
+                    if standby:
+                        self._api_standby = self._new_reserve(standby)
                     if name != "Test":
                         hass.data[DOMAIN][dev_id] = {
                             "tuyadevice": self._api,
@@ -211,6 +216,11 @@ class TuyaLocalDevice(object):
     def has_reserve(self):
         """Whether a command can still go out over Bluetooth with Wi-Fi down."""
         return self._api_standby is not None
+
+    def attach_reserve(self, address: str) -> None:
+        """Take a radio heard nearby as the way in when Wi-Fi fails."""
+        if self._api_standby is None and self._new_reserve is not None:
+            self._api_standby = self._new_reserve(address)
 
     @property
     def is_responding(self):

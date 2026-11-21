@@ -1964,7 +1964,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         (radio.in_range ? " · " + radio.rssi + " dBm" : "") +
         (!radio.name && radio.advertised ? " · " + radio.advertised : "");
       const advice = row.querySelector(".advice");
-      if (radio.reserve) advice.textContent = this._t("ble_reserve");
+      if (radio.reserve) advice.textContent = this._t(radio.ready ? "ble_reserve" : "ble_reserve_waiting");
       else if (!radio.name) advice.textContent = this._t("ble_unknown_help");
       else if (!radio.in_range) advice.textContent = this._t("ble_unheard_help");
       else advice.remove();

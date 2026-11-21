@@ -768,3 +768,40 @@ async def test_refresh_error_914_stays_quiet_when_rotating_protocols(
         await subject.async_refresh()
 
     assert caplog.text == ""
+
+
+def test_a_reserve_learned_earlier_is_there_from_the_start(
+    patched_hass, mock_api, mocker
+):
+    patched_hass.data["tuya_selfhost_radios"] = mocker.MagicMock(
+        reserves={"some_dev_id": "AA:00:00:00:00:02"}
+    )
+    transport = mocker.patch("custom_components.tuya_selfhost.device._ble_transport")
+    device = TuyaLocalDevice(
+        "Fence", "some_dev_id", "10.0.0.4", "some_local_key", "auto", None, patched_hass
+    )
+    assert device.has_reserve
+    assert transport.call_args.args[-1] == "AA:00:00:00:00:02"
+
+
+async def test_a_radio_heard_later_carries_the_command_wifi_lost(
+    subject, mock_api, mocker
+):
+    mocker.patch(
+        "custom_components.tuya_selfhost.device.asyncio.sleep", new=mocker.AsyncMock()
+    )
+    reserve = mocker.MagicMock()
+    mocker.patch(
+        "custom_components.tuya_selfhost.device._ble_transport", return_value=reserve
+    )
+    subject._protocol_configured = 3.4
+    subject._new_reserve = lambda address: reserve
+    assert not subject.has_reserve
+
+    subject.attach_reserve("AA:00:00:00:00:02")
+    mock_api().set_multiple_values.side_effect = Exception("Unable to Connect")
+    await subject.async_set_property("1", True)
+
+    reserve.set_multiple_values.assert_called_once_with({"1": True}, nowait=True)
+    reserve.close.assert_called_once()
+    assert subject.get_property("1") is True
