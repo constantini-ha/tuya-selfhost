@@ -4,6 +4,7 @@ import { OUTLET_CSS, OUTLET_KINDS, deviceKind, keyOwnName, kindGlyph, loadOutlet
 
 import { SCENE_CSS, SceneMethods } from "./scenes.js";
 import { AUTO_CSS, AutomationMethods } from "./automations.js";
+import { readActions, sameKeys, within, writeActions } from "./shortcuts.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
 const LAYOUT_SET = "tuya_selfhost/layout/set";
@@ -16,6 +17,7 @@ const CLOUD_DEVICES = "tuya_selfhost/cloud/devices";
 const CLOUD_ADD = "tuya_selfhost/cloud/add";
 const ZHA_DEVICES = "zha/devices";
 const RENAME = "tuya_selfhost/rename";
+const PRESSES = "tuya_selfhost/presses";
 
 const ICONS = [
   "mdi:power", "mdi:snowflake", "mdi:snowflake-melt", "mdi:fan",
@@ -459,6 +461,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     const NAMED = {
       remote_button_short_press: "press_short",
       remote_button_double_press: "press_double",
+      remote_button_triple_press: "press_triple",
       remote_button_long_press: "press_long",
     };
     return NAMED[command] ? this._t(NAMED[command]) : null;
@@ -474,9 +477,9 @@ class TuyaSelfhostPanel extends HTMLElement {
     );
   }
 
-  _pressOf(auto) {
+  _pressOf(entry, auto) {
     for (const trigger of auto.triggers || []) {
-      const label = this._pressLabel((trigger.event_data || {}).command || trigger.subtype);
+      const label = this._triggerName(entry, trigger, false);
       if (label) return label;
     }
     return null;
@@ -709,15 +712,81 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   // ---------- shortcuts made from a press ----------
 
+  // What ZHA calls each press of this device (any model), fetched once per device.
+  _pressesOf(entry) {
+    const id = entry.zha && entry.zha.device_reg_id;
+    if (!id) return [];
+    this._presses = this._presses || {};
+    if (!(id in this._presses)) {
+      this._presses[id] = [];
+      this._hass
+        .callWS({ type: PRESSES, device_id: id })
+        .then((presses) => {
+          this._presses[id] = presses || [];
+          this._render();
+        })
+        .catch(() => {});
+      this._loadPressWords();
+    }
+    return this._presses[id];
+  }
+
+  async _loadPressWords() {
+    if (this._zhaWords !== undefined) return;
+    this._zhaWords = null;
+    try {
+      this._zhaWords = await this._hass.loadBackendTranslation("device_automation", "zha");
+      this._render();
+    } catch (err) {
+      this._zhaWords = null;
+    }
+  }
+
+  // The press an event or a saved trigger stands for, matched the way ZHA's logbook does.
+  _pressFor(entry, data) {
+    const { device_ieee: _ieee, device_id: _id, unique_id: _unique, ...fields } = data || {};
+    if (!Object.keys(fields).length) return null;
+    return (
+      this._pressesOf(entry).find(
+        (press) => within(press.data, fields) || within(fields, press.data)
+      ) || null
+    );
+  }
+
+  _pressWords(entry, press) {
+    const zha = (key, vars) => (this._zhaWords && this._zhaWords(key, vars)) || "";
+    const sub =
+      zha("component.zha.device_automation.trigger_subtype." + press.subtype) ||
+      press.subtype.replace(/_/g, " ");
+    const kind =
+      this._pressLabel(press.type) ||
+      zha("component.zha.device_automation.trigger_type." + press.type, { subtype: sub }) ||
+      press.type.replace(/_/g, " ");
+    const buttons = new Set(this._pressesOf(entry).map((item) => item.subtype));
+    return buttons.size > 1 ? sub + ", " + kind : kind;
+  }
+
+  // A trigger's press in words; a command ZHA does not name shows raw only when asked.
+  _triggerName(entry, trigger, raw = true) {
+    if ((trigger.trigger || trigger.platform) === "device" && trigger.domain === "zha")
+      return this._pressWords(entry, trigger);
+    if (trigger.event_type !== "zha_event") return null;
+    const data = trigger.event_data || {};
+    const press = this._pressFor(entry, data);
+    if (press) return this._pressWords(entry, press);
+    return this._pressLabel(data.command) || (raw && data.command) || null;
+  }
+
   _startShortcut(entry) {
-    this._newAuto = { entry_id: entry.entry_id, command: null, params: null, error: null,
-                      target: null, keys: [], act: "toggle" };
+    this._pressesOf(entry);
+    this._newAuto = { entry_id: entry.entry_id, trigger: null, error: null,
+                      target: null, keys: [], act: "toggle", retry: 0 };
     this._render();
     this._listenPress(entry);
   }
 
-  // One press can speak twice: the quirk's own command and the friendly
-  // remote_button_* one. Collect for a moment and keep the friendly one.
+  // One press can speak twice (an attribute report, a quirk's own command and its
+  // remote_button_* twin): collect for a moment, then keep the one ZHA names.
   async _listenPress(entry) {
     this._stopPress();
     const draft = this._newAuto;
@@ -726,11 +795,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     try {
       this._unpress = await this._hass.connection.subscribeEvents((event) => {
         const data = (event && event.data) || {};
-        if (!this._newAuto || this._newAuto.command) return;
+        if (!this._newAuto || this._newAuto.trigger) return;
         if (data.device_ieee !== entry.zha.ieee) return;
         this._newAuto.heard.push(data);
         clearTimeout(this._pressPick);
-        this._pressPick = setTimeout(() => this._pickPress(), 700);
+        this._pressPick = setTimeout(() => this._pickPress(entry), 700);
       }, "zha_event");
     } catch (err) {
       draft.error = this._errText(err);
@@ -739,24 +808,38 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     this._pressTimer = setTimeout(() => {
       this._stopPress();
-      if (this._newAuto && !this._newAuto.command) {
+      if (this._newAuto && !this._newAuto.trigger) {
         this._newAuto.error = this._t("press_none");
         this._render();
       }
     }, 30000);
   }
 
-  _pickPress() {
+  _pickPress(entry) {
     const draft = this._newAuto;
-    if (!draft || draft.command || !draft.heard.length) return;
+    if (!draft || draft.trigger || !draft.heard.length) return;
     const heard = draft.heard;
-    const best =
-      heard.find((data) => String(data.command || "").startsWith("remote_button_")) ||
-      // A button can report its on/off attribute along with the press; the command is the press.
-      heard.find((data) => data.command && data.command !== "attribute_updated") ||
-      heard[0];
-    draft.command = best.command;
-    draft.params = best.params && Object.keys(best.params).length ? best.params : null;
+    const press = heard.map((data) => this._pressFor(entry, data)).find(Boolean);
+    let match;
+    if (press) {
+      // The very fields ZHA's own trigger for this press listens to, button included.
+      match = { ...press.data };
+    } else {
+      const best =
+        heard.find((data) => String(data.command || "").startsWith("remote_button_")) ||
+        // A button can report its on/off attribute along with the press; the command is the press.
+        heard.find((data) => data.command && data.command !== "attribute_updated") ||
+        heard[0];
+      match = { command: best.command };
+      // A quirk that only speaks press_type says which press in the params.
+      if (best.params && Object.keys(best.params).length && !String(best.command).startsWith("remote_button_"))
+        match.params = best.params;
+    }
+    draft.trigger = {
+      trigger: "event",
+      event_type: "zha_event",
+      event_data: { device_ieee: entry.zha.ieee, ...match },
+    };
     this._stopPress();
     this._render();
   }
@@ -776,49 +859,37 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
-  // Only "this press switches these keys" fits the form; anything richer is Home Assistant's.
-  _shortcutOf(auto) {
-    const actions = auto.config.actions || auto.config.action || [];
-    if (actions.length !== 1 || auto.triggers.length !== 1) return null;
-    const [action] = actions;
-    const [trigger] = auto.triggers;
-    const data = trigger.event_type === "zha_event" ? trigger.event_data || {} : {};
-    if (!data.command) return null;
-    if (Object.keys(action).some((key) => !["action", "service", "target", "data", "metadata"].includes(key)))
-      return null;
-    const act = String(action.action || action.service || "").split(".")[1];
-    if (!["toggle", "turn_on", "turn_off"].includes(act)) return null;
-    const { entity_id: ids, ...extra } = { ...(action.data || {}), ...(action.target || {}) };
-    const keys = [].concat(ids || []);
-    if (Object.keys(extra).length || !keys.length) return null;
+  // One press that switches keys of one device fits the form; anything richer is Home Assistant's.
+  _shortcutOf(entry, auto) {
+    if (auto.triggers.length !== 1 || !this._triggerName(entry, auto.triggers[0])) return null;
+    const read = readActions(auto.config.actions || auto.config.action);
+    if (!read) return null;
     const target = this._shortcutTargets().find((item) =>
-      keys.every((id) => item.gangs.some((gang) => gang.entity_id === id))
+      read.keys.every((id) => item.gangs.some((gang) => gang.entity_id === id))
     );
     if (!target) return null;
-    return { command: data.command, params: data.params || null, target: target.id, keys, act };
+    return { ...read, trigger: auto.triggers[0], target: target.id };
   }
 
   _editShortcut(entry, auto) {
-    const shortcut = entry.zha && this._shortcutOf(auto);
+    const shortcut = entry.zha && this._shortcutOf(entry, auto);
     if (!shortcut) {
       this._navigate("/config/automation/edit/" + auto.config.id);
       return;
     }
     this._stopPress();
-    this._newAuto = { ...shortcut, entry_id: entry.entry_id, edit: auto, was: shortcut.command,
+    this._newAuto = { ...shortcut, entry_id: entry.entry_id, edit: auto,
+                      was: { act: shortcut.act, keys: shortcut.keys,
+                             press: this._triggerName(entry, shortcut.trigger) },
                       error: null, heard: [] };
     this._render();
   }
 
   _relisten(entry) {
-    this._newAuto.command = null;
+    this._newAuto.trigger = null;
     this._newAuto.relearn = true;
     this._render();
     this._listenPress(entry);
-  }
-
-  _pressText(command) {
-    return this._pressLabel(command) || command;
   }
 
   _shortcutTargets() {
@@ -830,32 +901,30 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   async _makeShortcut(entry) {
     const draft = this._newAuto;
-    if (!draft || !draft.keys.length) return;
-    const press = this._pressText(draft.command);
-    const data = { device_ieee: entry.zha.ieee, command: draft.command };
-    // A quirk that only speaks press_type says which press in the params, and
-    // without them the shortcut would answer every press alike.
-    if (draft.params && !String(draft.command).startsWith("remote_button_"))
-      data.params = draft.params;
-    const trigger = { trigger: "event", event_type: "zha_event", event_data: data };
-    const actions = [{ action: "homeassistant." + draft.act, target: { entity_id: draft.keys } }];
+    if (!draft || !draft.trigger || !draft.keys.length) return;
+    const press = this._triggerName(entry, draft.trigger);
     const saved = draft.edit && draft.edit.config;
+    const kept = saved && draft.was.act === draft.act && sameKeys(draft.was.keys, draft.keys);
+    // Untouched, the saved steps stay exactly as they were, whoever wrote them.
+    const actions = kept ? saved.actions || saved.action : writeActions(draft);
     let config;
     if (saved) {
-      const { trigger: _old, action: _older, ...kept } = saved;
-      const before = " \u00b7 " + this._pressText(draft.was);
+      const { trigger: _old, action: _older, ...rest } = saved;
+      const before = " · " + draft.was.press;
       const alias = saved.alias || "";
       config = {
-        ...kept,
-        alias: draft.relearn && alias.endsWith(before) ? alias.slice(0, -before.length) + " \u00b7 " + press : saved.alias,
-        triggers: draft.relearn ? [trigger] : draft.edit.triggers,
+        ...rest,
+        alias: draft.relearn && alias.endsWith(before)
+          ? alias.slice(0, -before.length) + " · " + press
+          : saved.alias,
+        triggers: [draft.trigger],
         actions,
       };
     } else {
       config = {
-        alias: entry.title + " \u00b7 " + press,
+        alias: entry.title + " · " + press,
         description: this._t("auto_made_here"),
-        triggers: [trigger],
+        triggers: [draft.trigger],
         conditions: [],
         actions,
         mode: "single",
@@ -904,7 +973,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     cancel.textContent = this._t("no");
     cancel.addEventListener("click", () => this._cancelShortcut());
 
-    if (!draft.command) {
+    if (!draft.trigger) {
       const text = document.createElement("div");
       text.className = "muted";
       text.style.marginBottom = "10px";
@@ -927,7 +996,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     const got = document.createElement("div");
     got.className = "muted grow";
     got.textContent = this._t(draft.edit && !draft.relearn ? "press_is" : "press_got", {
-      press: this._pressText(draft.command),
+      press: this._triggerName(entry, draft.trigger),
     });
     const relisten = document.createElement("button");
     relisten.className = "act ghost";
@@ -1096,7 +1165,7 @@ class TuyaSelfhostPanel extends HTMLElement {
 
       name.textContent = auto.config.alias || auto.entity_id;
       facts.textContent = [
-        this._pressOf(auto),
+        this._pressOf(entry, auto),
         when ? this._t("last_run", { when: this._ago(when) }) : this._t("never_run"),
       ]
         .filter(Boolean)

@@ -173,11 +173,22 @@ contradicts your instinct, trust the note.
   answers any report from that cluster, and it once drove the garage that way.
 - A target with one key is picked by itself; two or more show as checkboxes (`_check`),
   not chips: a chip read as a link, and the owner did not see it was a choice.
-- **Editar** on a shortcut row reopens the same form, filled from the saved config
-  (`_shortcutOf`). Only one zha_event trigger plus one toggle/turn_on/turn_off on keys
-  of one device fits; anything else opens Home Assistant's own editor. Saving posts to
-  the same id and keeps the rest of the config; the trigger changes only after
-  **Ouvir de novo**, and then a name ending in the old press gets the new one.
+- **Buttons always edit in the simple form** (owner's call, 22/11: "mais simples e fácil de
+  entender"). **Editar** reopens the create form filled from the saved automation; only a
+  shape the form cannot hold opens Home Assistant's editor. `shortcuts.js` reads and writes
+  the action as `{act, keys, retry}`: a plain toggle/turn_on/turn_off, the suite master's
+  "any on → all off, else all on" (`choose` + `or` of states, or `match: any`), and the
+  old garage's retry (`repeat` count + `wait_template` + template check). Saved untouched
+  (same act and keys), the original steps go back verbatim; changed, `writeActions` writes
+  them, keeping the retry. Toggle on 2+ keys is written as the together form, never a
+  plain `homeassistant.toggle` (keys that were mixed would stay mixed).
+- Presses are named from ZHA's own table, `tuya_selfhost/presses` (`presses.py`, the
+  device's `device_automation_triggers`, as ZHA's logbook does), so any model works: a
+  learnt press saves the exact fields ZHA matches (endpoint and cluster included, so one
+  button of a multi-button remote does not answer for the others), and a SNZB-01P
+  `toggle` reads "toque simples". Words come from our i18n, then ZHA's own
+  device_automation translations, then the raw type. The trigger changes only after
+  **Ouvir de novo**; then a name ending in the old press gets the new one.
 - Confirmed on the hardware (`_TZ3000_yj6k7vfo` TS0041, quirk
   `TuyaSmartRemote0041TOPlusA`): a tap is `press_type: 0`, a double tap is `1`
   and a hold is `2`, each paired with its `remote_button_*` twin. A hold under

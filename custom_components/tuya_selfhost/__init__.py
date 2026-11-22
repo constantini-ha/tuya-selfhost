@@ -33,6 +33,7 @@ from .helpers.device_config import get_config
 from .helpers.discovery import async_start_discovery, async_stop_discovery
 from .ble.reserve import async_start_radios, async_stop_radios
 from .names import async_setup_names
+from .presses import async_setup_presses
 from .notices import async_start_notices, async_stop_notices
 from .remote_card import async_setup_remote_card
 from .cloud import async_restore_auth
@@ -1015,6 +1016,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await async_start_discovery(hass)
     await async_setup_remote_card(hass)
     async_setup_names(hass)
+    async_setup_presses(hass)
     await async_restore_auth(hass)
     await async_setup_cloud_api(hass)
     await async_start_notices(hass)
