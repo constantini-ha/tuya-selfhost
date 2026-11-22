@@ -751,7 +751,10 @@ class TuyaSelfhostPanel extends HTMLElement {
     if (!draft || draft.command || !draft.heard.length) return;
     const heard = draft.heard;
     const best =
-      heard.find((data) => String(data.command || "").startsWith("remote_button_")) || heard[0];
+      heard.find((data) => String(data.command || "").startsWith("remote_button_")) ||
+      // A button can report its on/off attribute along with the press; the command is the press.
+      heard.find((data) => data.command && data.command !== "attribute_updated") ||
+      heard[0];
     draft.command = best.command;
     draft.params = best.params && Object.keys(best.params).length ? best.params : null;
     this._stopPress();
@@ -900,10 +903,13 @@ class TuyaSelfhostPanel extends HTMLElement {
     pickers.append(where, what);
     box.appendChild(pickers);
 
+    const gangs = picked ? picked.gangs : [];
+    // A device with one key leaves nothing to choose.
+    if (gangs.length === 1) draft.keys = [gangs[0].entity_id];
     const keys = document.createElement("div");
     keys.className = "row";
     keys.style.cssText = "flex-wrap:wrap;margin-top:10px";
-    for (const gang of picked ? picked.gangs : []) {
+    for (const gang of gangs.length > 1 ? gangs : []) {
       const chosen = draft.keys.includes(gang.entity_id);
       const chip = document.createElement("button");
       chip.className = chosen ? "act" : "act ghost";
@@ -916,7 +922,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       });
       keys.appendChild(chip);
     }
-    box.appendChild(keys);
+    if (gangs.length > 1) box.appendChild(keys);
 
     if (draft.error) {
       const failed = document.createElement("div");

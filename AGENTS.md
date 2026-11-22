@@ -167,6 +167,11 @@ contradicts your instinct, trust the note.
   waits 700ms and prefers the friendly one, because matching on `press_type`
   alone would fire for every gesture. When only the quirk speaks, the params go
   into the trigger too.
+- A SNZB-01P press also reports its `on_off` attribute (`attribute_updated`) in the
+  same instant, sometimes first. `_pickPress()` takes any real command over
+  `attribute_updated`, which is only a last resort: matched without its args it
+  answers any report from that cluster, and it once drove the garage that way.
+- A target with one key is picked by itself; key chips only show for two or more.
 - Confirmed on the hardware (`_TZ3000_yj6k7vfo` TS0041, quirk
   `TuyaSmartRemote0041TOPlusA`): a tap is `press_type: 0`, a double tap is `1`
   and a hold is `2`, each paired with its `remote_button_*` twin. A hold under
