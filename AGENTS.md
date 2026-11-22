@@ -171,7 +171,8 @@ contradicts your instinct, trust the note.
   same instant, sometimes first. `_pickPress()` takes any real command over
   `attribute_updated`, which is only a last resort: matched without its args it
   answers any report from that cluster, and it once drove the garage that way.
-- A target with one key is picked by itself; key chips only show for two or more.
+- A target with one key is picked by itself; two or more show as checkboxes (`_check`),
+  not chips: a chip read as a link, and the owner did not see it was a choice.
 - Confirmed on the hardware (`_TZ3000_yj6k7vfo` TS0041, quirk
   `TuyaSmartRemote0041TOPlusA`): a tap is `press_type: 0`, a double tap is `1`
   and a hold is `2`, each paired with its `remote_button_*` twin. A hold under

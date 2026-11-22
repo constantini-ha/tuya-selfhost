@@ -907,20 +907,17 @@ class TuyaSelfhostPanel extends HTMLElement {
     // A device with one key leaves nothing to choose.
     if (gangs.length === 1) draft.keys = [gangs[0].entity_id];
     const keys = document.createElement("div");
-    keys.className = "row";
-    keys.style.cssText = "flex-wrap:wrap;margin-top:10px";
+    keys.style.marginTop = "6px";
     for (const gang of gangs.length > 1 ? gangs : []) {
-      const chosen = draft.keys.includes(gang.entity_id);
-      const chip = document.createElement("button");
-      chip.className = chosen ? "act" : "act ghost";
-      chip.textContent = this._shortName(gang.entity_id, picked.title);
-      chip.addEventListener("click", () => {
-        draft.keys = chosen
-          ? draft.keys.filter((id) => id !== gang.entity_id)
-          : [...draft.keys, gang.entity_id];
-        this._render();
-      });
-      keys.appendChild(chip);
+      const name = this._shortName(gang.entity_id, picked.title);
+      keys.appendChild(
+        this._check(name, draft.keys.includes(gang.entity_id), (on) => {
+          draft.keys = on
+            ? [...draft.keys, gang.entity_id]
+            : draft.keys.filter((id) => id !== gang.entity_id);
+          make.disabled = !draft.keys.length;
+        })
+      );
     }
     if (gangs.length > 1) box.appendChild(keys);
 
