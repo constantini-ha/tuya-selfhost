@@ -1,4 +1,4 @@
-import { t } from "./i18n.js";
+import { LANGUAGES, t } from "./i18n.js";
 import { OUTLET_CSS, OUTLET_KINDS, deviceKind, keyOwnName, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
   outletNames, saveOutletKinds } from "./outlets.js";
 
@@ -18,6 +18,12 @@ const CLOUD_ADD = "tuya_selfhost/cloud/add";
 const ZHA_DEVICES = "zha/devices";
 const RENAME = "tuya_selfhost/rename";
 const PRESSES = "tuya_selfhost/presses";
+const PRESS_WORDS = {
+  remote_button_short_press: "press_short",
+  remote_button_double_press: "press_double",
+  remote_button_triple_press: "press_triple",
+  remote_button_long_press: "press_long",
+};
 
 const ICONS = [
   "mdi:power", "mdi:snowflake", "mdi:snowflake-melt", "mdi:fan",
@@ -458,13 +464,29 @@ class TuyaSelfhostPanel extends HTMLElement {
   }
 
   _pressLabel(command) {
-    const NAMED = {
-      remote_button_short_press: "press_short",
-      remote_button_double_press: "press_double",
-      remote_button_triple_press: "press_triple",
-      remote_button_long_press: "press_long",
-    };
-    return NAMED[command] ? this._t(NAMED[command]) : null;
+    return PRESS_WORDS[command] ? this._t(PRESS_WORDS[command]) : null;
+  }
+
+  // A name the panel wrote ends in " · <press>" in its maker's language: where that starts, or -1.
+  _pressTail(alias, label) {
+    for (const key of Object.values(PRESS_WORDS)) {
+      const mine = this._t(key);
+      if (!label.includes(mine)) continue;
+      for (const language of LANGUAGES) {
+        const tail = " \u00b7 " + label.split(mine).join(t({ language }, key));
+        if (alias.endsWith(tail)) return alias.length - tail.length;
+      }
+    }
+    const tail = " \u00b7 " + label;
+    return alias.endsWith(tail) ? alias.length - tail.length : -1;
+  }
+
+  // The shortcut's name with its press in the language of whoever is looking.
+  _aliasText(entry, auto) {
+    const alias = auto.config.alias || auto.entity_id;
+    const press = auto.triggers.length === 1 && this._triggerName(entry, auto.triggers[0]);
+    const cut = press ? this._pressTail(alias, press) : -1;
+    return cut < 0 ? alias : alias.slice(0, cut) + " \u00b7 " + press;
   }
 
   // What a device sets off, not what acts on it: only the triggers are searched.
@@ -910,13 +932,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     let config;
     if (saved) {
       const { trigger: _old, action: _older, ...rest } = saved;
-      const before = " · " + draft.was.press;
       const alias = saved.alias || "";
+      const cut = draft.relearn ? this._pressTail(alias, draft.was.press) : -1;
       config = {
         ...rest,
-        alias: draft.relearn && alias.endsWith(before)
-          ? alias.slice(0, -before.length) + " · " + press
-          : saved.alias,
+        alias: cut < 0 ? saved.alias : alias.slice(0, cut) + " \u00b7 " + press,
         triggers: [draft.trigger],
         actions,
       };
@@ -1136,7 +1156,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       row.append(label, acts);
 
       if (drafting && drafting.edit && drafting.edit.entity_id === auto.entity_id) {
-        name.textContent = auto.config.alias || auto.entity_id;
+        name.textContent = this._aliasText(entry, auto);
         row.replaceChildren(name, this._shortcutForm(entry));
         box.appendChild(row);
         continue;
@@ -1145,7 +1165,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       if (this._confirmAuto === auto.entity_id) {
         name.className = "muted";
         name.textContent = this._t("confirm_delete_auto", {
-          name: auto.config.alias || auto.entity_id,
+          name: this._aliasText(entry, auto),
         });
         const yes = document.createElement("button");
         yes.className = "act warn";
@@ -1163,7 +1183,7 @@ class TuyaSelfhostPanel extends HTMLElement {
         continue;
       }
 
-      name.textContent = auto.config.alias || auto.entity_id;
+      name.textContent = this._aliasText(entry, auto);
       facts.textContent = [
         this._pressOf(entry, auto),
         when ? this._t("last_run", { when: this._ago(when) }) : this._t("never_run"),

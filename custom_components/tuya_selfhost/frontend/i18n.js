@@ -1064,3 +1064,5 @@ export function t(hass, key, vars = {}) {
 export function tn(key, vars = {}) {
   return t({ language: (navigator && navigator.language) || "en" }, key, vars);
 }
+
+export const LANGUAGES = Object.keys(STRINGS);

@@ -189,6 +189,9 @@ contradicts your instinct, trust the note.
   `toggle` reads "toque simples". Words come from our i18n, then ZHA's own
   device_automation translations, then the raw type. The trigger changes only after
   **Ouvir de novo**; then a name ending in the old press gets the new one.
+- A shortcut's name is saved once, in its maker's language ("Botão garagem · toque simples").
+  `_aliasText` shows the press part in the viewer's language (any of `LANGUAGES`), and
+  `_pressTail` finds that part in any language when a re-learnt press renames it.
 - Confirmed on the hardware (`_TZ3000_yj6k7vfo` TS0041, quirk
   `TuyaSmartRemote0041TOPlusA`): a tap is `press_type: 0`, a double tap is `1`
   and a hold is `2`, each paired with its `remote_button_*` twin. A hold under
