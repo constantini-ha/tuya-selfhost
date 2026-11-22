@@ -27,12 +27,15 @@ você. Vá em **Ferramentas de desenvolvedor → Ações**, execute **Tuya Selfh
 Configuração da Alexa** e copie o campo `yaml` da resposta.
 
 Você recebe um bloco `alexa:` completo com todas as entidades do Tuya Selfhost
-que a Alexa entende, cada uma já com o nome que tem no Home Assistant.
+que a Alexa entende. Ele não define nomes: a partir do Home Assistant 2026.11 a
+Alexa fala o nome que cada tecla ou aparelho tem no painel, e renomear ali, Wi-Fi
+ou Zigbee, chega à Alexa na hora. Um `name:` dentro do `entity_config` congela o
+nome, então deixe de fora.
 
 ## 2. Cole no `configuration.yaml`
 
 Cole o bloco como está e reinicie o Home Assistant. Se você já tem uma seção
-`alexa:`, junte as listas `include_entities` e `entity_config` à que existe, em
+`alexa:`, junte a lista `include_entities` à que existe, em
 vez de criar uma segunda.
 
 ## 3. Ligue o relatório proativo de estado
@@ -92,7 +95,7 @@ vinculada de novo, não apenas recarregada.
 
 **Um interruptor aparece como tomada, mas comanda uma luz.** Acrescente
 `display_categories: LIGHT` naquela entidade dentro do `entity_config`. A Alexa
-aceita renomeação na redescoberta, mas *não* aceita mudança de categoria — você
+aceita nome novo na hora, mas *não* aceita mudança de categoria — você
 também precisa esquecer o aparelho no app e detectar de novo.
 
 **Nada é detectado.** Confira se o vínculo de conta ainda funciona dando um

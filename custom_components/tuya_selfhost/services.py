@@ -64,7 +64,9 @@ async def async_setup_services(hass: HomeAssistant, entities: list[str]):
         DOMAIN,
         "alexa_announce",
         partial(async_handle_alexa_announce, hass),
-        schema=vol.Schema({vol.Optional("forget"): vol.All(cv.ensure_list, [cv.string])}),
+        schema=vol.Schema(
+            {vol.Optional("forget"): vol.All(cv.ensure_list, [cv.string])}
+        ),
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
@@ -103,11 +105,6 @@ ALEXA_DOMAINS = frozenset(
 )
 
 
-def _yaml_quote(value: str) -> str:
-    """Quote a scalar so any character is safe inside generated YAML."""
-    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
 async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
     """Build an alexa: block covering every Tuya Selfhost entity."""
     registry = er.async_get(hass)
@@ -116,21 +113,7 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
         for item in er.async_entries_for_config_entry(registry, entry.entry_id):
             if item.disabled_by or item.hidden_by or item.domain not in ALEXA_DOMAINS:
                 continue
-            state = hass.states.get(item.entity_id)
-            if item.entity_id.startswith(
-                (f"button.{OBJECT_ID_PREFIX}_", f"switch.{OBJECT_ID_PREFIX}_")
-            ):
-                # A remote key is already named "<remote> <key>"; the device name
-                # Home Assistant prepends would make it unspeakable.
-                name = item.name or item.original_name or item.entity_id
-            else:
-                name = (
-                    (state.attributes.get("friendly_name") if state else None)
-                    or item.name
-                    or item.original_name
-                    or item.entity_id
-                )
-            entities.append((item.entity_id, str(name)))
+            entities.append(item.entity_id)
     entities.sort()
 
     lines = [
@@ -153,13 +136,14 @@ async def async_handle_alexa_config(hass: HomeAssistant, call: ServiceCall):
         f"        - script.{SCENE_PREFIX}*",
         "      include_entities:",
     ]
-    lines += [f"        - {entity_id}" for entity_id, _ in entities]
-    lines.append("    entity_config:")
-    for entity_id, name in entities:
-        lines.append(f"      {entity_id}:")
-        lines.append(f"        name: {_yaml_quote(name)}")
+    lines += [f"        - {entity_id}" for entity_id in entities]
+    lines += [
+        "    # No names here: Alexa says the name given in the panel, and a name",
+        "    # under entity_config would keep a rename there from reaching it.",
+    ]
 
     return {"yaml": "\n".join(lines), "entity_count": len(entities)}
+
 
 async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
     """Hand every remote key and panel scene to Alexa, without waiting for a discovery.
@@ -191,9 +175,7 @@ async def async_handle_alexa_announce(hass: HomeAssistant, call: ServiceCall):
         exposed = bool(config and config.should_expose(f"script.{SCENE_PREFIX}probe"))
     except Exception:  # an internal reach, like the rest of the Alexa glue
         exposed = False
-    sent = await async_announce_to_alexa(
-        hass, entity_ids + (scenes if exposed else [])
-    )
+    sent = await async_announce_to_alexa(hass, entity_ids + (scenes if exposed else []))
     return {
         "entity_count": len(entity_ids),
         "scene_count": len(scenes),

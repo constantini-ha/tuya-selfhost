@@ -27,12 +27,14 @@ you. Go to **Developer tools → Actions**, run **Tuya Selfhost: Alexa
 configuration**, and copy the `yaml` field from the response.
 
 You get a complete `alexa:` block with every Tuya Selfhost entity Alexa can
-handle, each one already carrying the name it has in Home Assistant.
+handle. It sets no names: from Home Assistant 2026.11 Alexa says the name each
+key or device has in the panel, and a rename there, Wi-Fi or Zigbee, reaches
+Alexa at once. A `name:` under `entity_config` freezes the name, so leave it out.
 
 ## 2. Paste it into `configuration.yaml`
 
 Paste the block as it is, then restart Home Assistant. If you already have an
-`alexa:` section, merge the `include_entities` and `entity_config` lists into it
+`alexa:` section, merge the `include_entities` list into it
 instead of adding a second one.
 
 ## 3. Turn on proactive state reporting
@@ -90,8 +92,8 @@ grant never arrived. Redo step 4 — the skill has to be unlinked and linked
 again, not merely reloaded.
 
 **A switch shows up as a plug when it drives a light.** Add
-`display_categories: LIGHT` under that entity in `entity_config`. Alexa picks up
-renames on rediscovery but *not* category changes, so you also have to forget
+`display_categories: LIGHT` under that entity in `entity_config`. Alexa takes
+new names on the fly but *not* category changes, so you also have to forget
 the device in the Alexa app and discover it again.
 
 **Nothing is discovered.** Check that account linking still works by issuing a

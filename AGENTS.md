@@ -375,8 +375,17 @@ contradicts your instinct, trust the note.
   one `switch` with `assumed_state`, which Alexa drives as a device through
   `PowerController`. The paired keys get no button of their own, or every
   assistant would list them twice. A lone key stays a scene and needs a name
-  that reads after "turn on". The name Alexa gets comes from `entity_config`, falling back to the
-  entity's own — which carries the device prefix and is unusable by voice.
+  that reads after "turn on". The name Alexa gets comes from `entity_config`; from Home
+  Assistant 2026.11, without one, it is the entity's **first registry alias**, where the
+  computed entry is device name + entity name. So a `name:` in `entity_config` freezes the
+  name: the `alexa_config` generator no longer writes any.
+- **Renaming goes through `tuya_selfhost/rename`** (`names.py`, keys and devices). It writes
+  the registry name and puts the same text first in the aliases, then sends AddOrUpdate for
+  the renamed entities the filter exposes; the answer carries `exposed`, `alexa` and `pinned`
+  (exposed ones a YAML name holds). A device rename only announces keys whose first alias is
+  the computed one; keys with a name of their own do not change in Alexa. Never rename with
+  `config/entity_registry/update` alone: the 2026.11 migration made the old name the first
+  alias of every renamed entity, so a bare name change leaves voice on the old one.
 - Renaming only reaches Alexa on the next AddOrUpdate, and a deleted key leaves
   a dead scene behind unless a DeleteReport goes out. Both are wired:
   `async_announce_to_alexa` and `async_forget_in_alexa`, plus the `forget` list
@@ -405,8 +414,8 @@ contradicts your instinct, trust the note.
 
 - Scenes sit behind a pill in the header (`this._scenes`), not on the device list:
   the list is for devices, and the user asked for it that way.
-- A key is renamed through `config/entity_registry/update` with `name`; `null`
-  restores the original. While a name is being typed (`this._renaming`) the
+- A key is renamed through `tuya_selfhost/rename` (see Alexa) with `name`; `null`
+  restores the original and speaks the computed name again. While a name is being typed (`this._renaming`) the
   `hass` setter must not redraw, or the field loses focus on every state change.
   A blur that changed nothing redraws 150 ms later, so the tap that caused the
   blur still reaches its target.
@@ -571,6 +580,12 @@ contradicts your instinct, trust the note.
   to close the window early. Joins arrive through an in-process dispatcher
   signal, not the event bus, so the panel polls `zha/devices` and diffs instead
   of subscribing to ZHA internals.
+- Zigbee keys are their rows from `config/entity_registry/list` (`this._registry`), so
+  they carry `name` and `config_entry_id` and get the same rename pencil as Wi-Fi keys.
+  `_refreshEntries` reloads Zigbee too: it rebuilds `_byEntry` and used to wipe their keys.
+- A Zigbee device is renamed from its page title, `rename` with `device_id` =
+  `device_reg_id` (`name_by_user`). `ha-card`'s `header` takes text only, so the title is a
+  slotted `h1.card-header`, which `ha-card` styles like its own.
 
 ### Zigbee quirks
 

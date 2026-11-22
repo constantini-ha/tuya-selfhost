@@ -27,12 +27,15 @@ Ve a **Herramientas para desarrolladores → Acciones**, ejecuta **Tuya Selfhost
 Configuración de Alexa** y copia el campo `yaml` de la respuesta.
 
 Obtienes un bloque `alexa:` completo con todas las entidades de Tuya Selfhost
-que Alexa admite, cada una con el nombre que tiene en Home Assistant.
+que Alexa admite. No fija nombres: desde Home Assistant 2026.11 Alexa dice el
+nombre que cada tecla o dispositivo tiene en el panel, y renombrar ahí, Wi-Fi o
+Zigbee, llega a Alexa al momento. Un `name:` dentro de `entity_config` congela el
+nombre, así que déjalo fuera.
 
 ## 2. Pégalo en `configuration.yaml`
 
 Pega el bloque tal cual y reinicia Home Assistant. Si ya tienes una sección
-`alexa:`, fusiona las listas `include_entities` y `entity_config` con la
+`alexa:`, fusiona la lista `include_entities` con la
 existente en lugar de crear una segunda.
 
 ## 3. Activa el informe proactivo de estado
@@ -92,7 +95,7 @@ vincular la skill, no solo recargarla.
 
 **Un interruptor aparece como enchufe aunque controla una luz.** Añade
 `display_categories: LIGHT` a esa entidad dentro de `entity_config`. Alexa
-acepta el cambio de nombre al redescubrir, pero *no* el de categoría: también
+acepta un nombre nuevo al momento, pero *no* el cambio de categoría: también
 tienes que olvidar el dispositivo en la app y detectarlo otra vez.
 
 **No se detecta nada.** Comprueba que la vinculación de cuenta siga funcionando

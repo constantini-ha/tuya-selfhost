@@ -15,6 +15,7 @@ const CLOUD_LOGOUT = "tuya_selfhost/cloud/logout";
 const CLOUD_DEVICES = "tuya_selfhost/cloud/devices";
 const CLOUD_ADD = "tuya_selfhost/cloud/add";
 const ZHA_DEVICES = "zha/devices";
+const RENAME = "tuya_selfhost/rename";
 
 const ICONS = [
   "mdi:power", "mdi:snowflake", "mdi:snowflake-melt", "mdi:fan",
@@ -43,6 +44,8 @@ const STYLE = `
 .tilename.can { display:inline-flex; align-items:center; gap:4px; border:none; background:none;
   font:inherit; font-size:.86em; cursor:pointer; padding:4px 2px; --mdc-icon-size:14px }
 .tilename.can ha-icon { color:var(--secondary-text-color) }
+.devname .tilename.can { font-size:inherit; padding:0; text-align:left; color:inherit; --mdc-icon-size:20px }
+.devname input.rename { margin:0; font-size:20px; text-align:left }
 input.rename { width:100%; box-sizing:border-box; margin-top:6px; font-size:16px; text-align:center }
 .kindrow input.rename { text-align:left; margin:0 0 2px }
 button.icon { border:none; background:transparent; color:var(--secondary-text-color);
@@ -292,13 +295,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._hass.callWS({ type: "config/entity_registry/list" }),
     ]);
     this._entries = entries || [];
-    this._byEntry = {};
-    for (const item of registry) {
-      if (item.platform !== "tuya_selfhost" || !item.config_entry_id) continue;
-      // A disabled or hidden entity never gets a state, so it has nothing to show.
-      if (item.disabled_by || item.hidden_by) continue;
-      (this._byEntry[item.config_entry_id] ||= []).push(item);
-    }
+    this._index(registry);
     this._layouts = {};
     for (const entry of this._entries) {
       const remote = this._remoteOf(entry);
@@ -313,6 +310,18 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
     this._watch();
     this._watchEntries();
+  }
+
+  _index(registry) {
+    this._registry = new Map(registry.map((item) => [item.entity_id, item]));
+    const zigbee = Object.entries(this._byEntry || {}).filter(([id]) => id.startsWith("zha:"));
+    this._byEntry = Object.fromEntries(zigbee);
+    for (const item of registry) {
+      if (item.platform !== "tuya_selfhost" || !item.config_entry_id) continue;
+      // A disabled or hidden entity never gets a state, so it has nothing to show.
+      if (item.disabled_by || item.hidden_by) continue;
+      (this._byEntry[item.config_entry_id] ||= []).push(item);
+    }
   }
 
   // A device added or removed anywhere (this tab, the form, another screen) shows up here.
@@ -354,12 +363,8 @@ class TuyaSelfhostPanel extends HTMLElement {
       return;
     }
     this._entries = entries || [];
-    this._byEntry = {};
-    for (const item of registry) {
-      if (item.platform !== "tuya_selfhost" || !item.config_entry_id) continue;
-      if (item.disabled_by || item.hidden_by) continue;
-      (this._byEntry[item.config_entry_id] ||= []).push(item);
-    }
+    this._index(registry);
+    await this._loadZigbee();
     for (const entry of this._entries) {
       const remote = this._remoteOf(entry);
       if (!remote || this._layouts[remote]) continue;
@@ -394,21 +399,24 @@ class TuyaSelfhostPanel extends HTMLElement {
   async _loadZigbee() {
     // Zigbee devices belong to Home Assistant's own integration, but they are
     // devices in this house like any other, so they belong in this list too.
-    this._zigbee = [];
     try {
       const devices = await this._hass.callWS({ type: ZHA_DEVICES });
+      // Built aside: a redraw while this is read must not find the device gone.
+      const found = [];
       for (const device of devices || []) {
         if (device.active_coordinator) continue;
         const id = "zha:" + device.ieee;
-        this._zigbee.push({
+        found.push({
           entry_id: id,
           title: device.user_given_name || device.name,
           zha: device,
         });
-        this._byEntry[id] = (device.entities || []).map((e) => ({
-          entity_id: e.entity_id,
-        }));
+        // The registry row carries the key's own name, and lets it be renamed.
+        this._byEntry[id] = (device.entities || []).map(
+          (e) => (this._registry && this._registry.get(e.entity_id)) || { entity_id: e.entity_id }
+        );
       }
+      this._zigbee = found;
     } catch (err) {
       this._zigbee = [];
       this._noZigbee = true;
@@ -518,7 +526,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     );
   }
 
-  // The name lives in the entity registry, so dashboards and voice get it too.
+  // The name lives in the entity registry and is the one spoken first, so dashboards and voice get it too.
   async _renameKey(entry, item, text) {
     const name = text.trim() || null;
     this._renaming = null;
@@ -529,10 +537,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     const before = this._friendly(item.entity_id);
     try {
-      await this._hass.callWS({
-        type: "config/entity_registry/update", entity_id: item.entity_id, name,
+      const answer = await this._hass.callWS({
+        type: RENAME, entity_id: item.entity_id, name,
       });
       item.name = name;
+      this._flash = this._renamedText(answer);
       // The state carries the old name until Home Assistant writes it again.
       for (let tries = 0; tries < 10 && this._friendly(item.entity_id) === before; tries += 1) {
         await new Promise((done) => setTimeout(done, 150));
@@ -541,6 +550,80 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._flash = this._t("rename_failed", { err: this._errText(err) });
     }
     this._render();
+  }
+
+  async _renameDevice(entry, text) {
+    const name = text.trim() || null;
+    this._renaming = null;
+    if (name === (entry.zha.user_given_name || null)) {
+      setTimeout(() => this._render(), 150);
+      return;
+    }
+    try {
+      const answer = await this._hass.callWS({
+        type: RENAME, device_id: entry.zha.device_reg_id, name,
+      });
+      this._flash = this._renamedText(answer);
+      await this._loadZigbee();
+    } catch (err) {
+      this._flash = this._t("rename_failed", { err: this._errText(err) });
+    }
+    this._render();
+  }
+
+  _renamedText(answer) {
+    if (!answer || !answer.exposed) return null;
+    if ((answer.pinned || []).length) return this._t("rename_pinned");
+    return this._t(answer.alexa ? "rename_alexa" : "keys_not_sent");
+  }
+
+  _deviceNameInput(entry) {
+    const input = document.createElement("input");
+    input.className = "rename";
+    input.value = entry.zha.user_given_name || "";
+    input.placeholder = entry.zha.name;
+    input.maxLength = 60;
+    input.enterKeyHint = "done";
+    input.setAttribute("aria-label", this._t("rename_device"));
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      if (save) this._renameDevice(entry, input.value);
+      else {
+        this._renaming = null;
+        this._render();
+      }
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") finish(true);
+      if (event.key === "Escape") finish(false);
+    });
+    input.addEventListener("blur", () => finish(true));
+    return input;
+  }
+
+  // ha-card styles a slotted .card-header like its own, and its own takes only text.
+  _deviceTitle(entry) {
+    const head = document.createElement("h1");
+    head.className = "card-header devname";
+    if (this._renaming === entry.entry_id) {
+      const input = this._deviceNameInput(entry);
+      head.appendChild(input);
+      setTimeout(() => input.focus(), 0);
+      return head;
+    }
+    const button = document.createElement("button");
+    button.className = "tilename can";
+    button.title = this._t("rename_device");
+    button.innerHTML = `<span></span><ha-icon icon="mdi:pencil-outline"></ha-icon>`;
+    button.querySelector("span").textContent = entry.title;
+    button.addEventListener("click", () => {
+      this._renaming = entry.entry_id;
+      this._render();
+    });
+    head.appendChild(button);
+    return head;
   }
 
   _renameInput(entry, item, shown) {
@@ -2326,7 +2409,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     const entry = this._entry();
     const remote = this._remoteOf(entry);
     const card = document.createElement("ha-card");
-    card.header = entry.title;
+    if (entry.zha && this._isAdmin()) card.appendChild(this._deviceTitle(entry));
+    else card.header = entry.title;
 
     const head = document.createElement("div");
     head.className = "pad row";
