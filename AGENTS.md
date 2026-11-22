@@ -173,6 +173,11 @@ contradicts your instinct, trust the note.
   answers any report from that cluster, and it once drove the garage that way.
 - A target with one key is picked by itself; two or more show as checkboxes (`_check`),
   not chips: a chip read as a link, and the owner did not see it was a choice.
+- **Editar** on a shortcut row reopens the same form, filled from the saved config
+  (`_shortcutOf`). Only one zha_event trigger plus one toggle/turn_on/turn_off on keys
+  of one device fits; anything else opens Home Assistant's own editor. Saving posts to
+  the same id and keeps the rest of the config; the trigger changes only after
+  **Ouvir de novo**, and then a name ending in the old press gets the new one.
 - Confirmed on the hardware (`_TZ3000_yj6k7vfo` TS0041, quirk
   `TuyaSmartRemote0041TOPlusA`): a tap is `press_type: 0`, a double tap is `1`
   and a hold is `2`, each paired with its `remote_button_*` twin. A hold under

@@ -776,6 +776,51 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
+  // Only "this press switches these keys" fits the form; anything richer is Home Assistant's.
+  _shortcutOf(auto) {
+    const actions = auto.config.actions || auto.config.action || [];
+    if (actions.length !== 1 || auto.triggers.length !== 1) return null;
+    const [action] = actions;
+    const [trigger] = auto.triggers;
+    const data = trigger.event_type === "zha_event" ? trigger.event_data || {} : {};
+    if (!data.command) return null;
+    if (Object.keys(action).some((key) => !["action", "service", "target", "data", "metadata"].includes(key)))
+      return null;
+    const act = String(action.action || action.service || "").split(".")[1];
+    if (!["toggle", "turn_on", "turn_off"].includes(act)) return null;
+    const { entity_id: ids, ...extra } = { ...(action.data || {}), ...(action.target || {}) };
+    const keys = [].concat(ids || []);
+    if (Object.keys(extra).length || !keys.length) return null;
+    const target = this._shortcutTargets().find((item) =>
+      keys.every((id) => item.gangs.some((gang) => gang.entity_id === id))
+    );
+    if (!target) return null;
+    return { command: data.command, params: data.params || null, target: target.id, keys, act };
+  }
+
+  _editShortcut(entry, auto) {
+    const shortcut = entry.zha && this._shortcutOf(auto);
+    if (!shortcut) {
+      this._navigate("/config/automation/edit/" + auto.config.id);
+      return;
+    }
+    this._stopPress();
+    this._newAuto = { ...shortcut, entry_id: entry.entry_id, edit: auto, was: shortcut.command,
+                      error: null, heard: [] };
+    this._render();
+  }
+
+  _relisten(entry) {
+    this._newAuto.command = null;
+    this._newAuto.relearn = true;
+    this._render();
+    this._listenPress(entry);
+  }
+
+  _pressText(command) {
+    return this._pressLabel(command) || command;
+  }
+
   _shortcutTargets() {
     const all = [...(this._entries || []), ...(this._zigbee || [])];
     return all
@@ -786,24 +831,40 @@ class TuyaSelfhostPanel extends HTMLElement {
   async _makeShortcut(entry) {
     const draft = this._newAuto;
     if (!draft || !draft.keys.length) return;
-    const press = this._pressLabel(draft.command) || draft.command;
+    const press = this._pressText(draft.command);
     const data = { device_ieee: entry.zha.ieee, command: draft.command };
     // A quirk that only speaks press_type says which press in the params, and
     // without them the shortcut would answer every press alike.
     if (draft.params && !String(draft.command).startsWith("remote_button_"))
       data.params = draft.params;
-    const config = {
-      alias: entry.title + " \u00b7 " + press,
-      description: this._t("auto_made_here"),
-      triggers: [{ trigger: "event", event_type: "zha_event", event_data: data }],
-      conditions: [],
-      actions: [{ action: "homeassistant." + draft.act, target: { entity_id: draft.keys } }],
-      mode: "single",
-    };
+    const trigger = { trigger: "event", event_type: "zha_event", event_data: data };
+    const actions = [{ action: "homeassistant." + draft.act, target: { entity_id: draft.keys } }];
+    const saved = draft.edit && draft.edit.config;
+    let config;
+    if (saved) {
+      const { trigger: _old, action: _older, ...kept } = saved;
+      const before = " \u00b7 " + this._pressText(draft.was);
+      const alias = saved.alias || "";
+      config = {
+        ...kept,
+        alias: draft.relearn && alias.endsWith(before) ? alias.slice(0, -before.length) + " \u00b7 " + press : saved.alias,
+        triggers: draft.relearn ? [trigger] : draft.edit.triggers,
+        actions,
+      };
+    } else {
+      config = {
+        alias: entry.title + " \u00b7 " + press,
+        description: this._t("auto_made_here"),
+        triggers: [trigger],
+        conditions: [],
+        actions,
+        mode: "single",
+      };
+    }
     try {
-      await this._hass.callApi("POST", "config/automation/config/" + Date.now(), config);
+      await this._hass.callApi("POST", "config/automation/config/" + (saved ? saved.id : Date.now()), config);
       this._newAuto = null;
-      this._flash = this._t("shortcut_saved");
+      this._flash = this._t(saved ? "shortcut_updated" : "shortcut_saved");
       this._refreshAutomations();
     } catch (err) {
       draft.error = this._t("shortcut_failed", { err: this._errText(err) });
@@ -861,12 +922,19 @@ class TuyaSelfhostPanel extends HTMLElement {
       return box;
     }
 
+    const heard = document.createElement("div");
+    heard.className = "row";
     const got = document.createElement("div");
-    got.className = "muted";
-    got.textContent = this._t("press_got", {
-      press: this._pressLabel(draft.command) || draft.command,
+    got.className = "muted grow";
+    got.textContent = this._t(draft.edit && !draft.relearn ? "press_is" : "press_got", {
+      press: this._pressText(draft.command),
     });
-    box.appendChild(got);
+    const relisten = document.createElement("button");
+    relisten.className = "act ghost";
+    relisten.textContent = this._t("press_again");
+    relisten.addEventListener("click", () => this._relisten(entry));
+    heard.append(got, relisten);
+    box.appendChild(heard);
 
     const targets = this._shortcutTargets();
     if (!draft.target && targets.length) draft.target = targets[0].id;
@@ -934,7 +1002,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     foot.style.marginTop = "12px";
     const make = document.createElement("button");
     make.className = "act";
-    make.textContent = this._t("create_shortcut");
+    make.textContent = this._t(draft.edit ? "save" : "create_shortcut");
     make.disabled = !draft.keys.length;
     make.addEventListener("click", () => this._makeShortcut(entry));
     foot.append(make, cancel);
@@ -981,6 +1049,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       box.appendChild(text);
     }
 
+    const drafting = this._newAuto && this._newAuto.entry_id === entry.entry_id ? this._newAuto : null;
     for (const auto of autos) {
       const state = this._hass.states[auto.entity_id];
       const on = state && state.state === "on";
@@ -996,6 +1065,13 @@ class TuyaSelfhostPanel extends HTMLElement {
       const acts = document.createElement("div");
       acts.className = "acts";
       row.append(label, acts);
+
+      if (drafting && drafting.edit && drafting.edit.entity_id === auto.entity_id) {
+        name.textContent = auto.config.alias || auto.entity_id;
+        row.replaceChildren(name, this._shortcutForm(entry));
+        box.appendChild(row);
+        continue;
+      }
 
       if (this._confirmAuto === auto.entity_id) {
         name.className = "muted";
@@ -1044,6 +1120,11 @@ class TuyaSelfhostPanel extends HTMLElement {
       );
       acts.append(run, toggle);
       if (auto.config.id) {
+        const edit = document.createElement("button");
+        edit.className = "act ghost";
+        edit.textContent = this._t("edit");
+        edit.addEventListener("click", () => this._editShortcut(entry, auto));
+        acts.appendChild(edit);
         const del = document.createElement("button");
         del.className = "act ghost";
         del.textContent = this._t("delete");
@@ -1057,9 +1138,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
 
     // Only a Zigbee device announces its presses, so only it can be learnt.
-    const drafting = this._newAuto && this._newAuto.entry_id === entry.entry_id;
     if (entry.zha && drafting) {
-      box.appendChild(this._shortcutForm(entry));
+      if (!drafting.edit) box.appendChild(this._shortcutForm(entry));
     } else if (entry.zha) {
       const make = document.createElement("button");
       make.className = "act";
