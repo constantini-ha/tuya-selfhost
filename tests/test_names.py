@@ -1,5 +1,6 @@
 """Tests for renaming from the panel, which also renames for voice."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.helpers import device_registry as dr
@@ -7,6 +8,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_registry import COMPUTED_NAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.tuya_selfhost import LOADED_SETTINGS, async_update_entry
+from custom_components.tuya_selfhost.const import DOMAIN
 from custom_components.tuya_selfhost.names import NAME, voice_aliases, websocket_rename
 
 
@@ -124,3 +127,67 @@ async def test_an_unknown_key_is_an_error(hass):
     connection, _ = await _rename(hass, None, entity_id="switch.gone", name="X")
 
     assert connection.send_error.call_args.args[1] == "not_found"
+
+
+def _wifi(hass):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Interruptor cozinha",
+        data={"device_id": "ebb7fa352594ef81c6fake", "host": "10.0.0.8"},
+    )
+    entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "ebb7fa352594ef81c6fake")},
+        name="Interruptor cozinha",
+    )
+    key = (
+        er.async_get(hass)
+        .async_get_or_create(
+            "switch",
+            DOMAIN,
+            "ebb7fa352594ef81c6fake-switch_1",
+            config_entry=entry,
+            device_id=device.id,
+            original_name="Interruptor 1",
+            has_entity_name=True,
+        )
+        .entity_id
+    )
+    running = SimpleNamespace(name="Interruptor cozinha")
+    hass.data.setdefault(DOMAIN, {})["ebb7fa352594ef81c6fake"] = {"device": running}
+    return entry, device.id, key, running
+
+
+async def test_a_wifi_device_renamed_keeps_running_under_the_new_name(hass):
+    entry, device_id, key, running = _wifi(hass)
+    dr.async_get(hass).async_update_device(device_id, name_by_user="Old HA name")
+    connection, announce = await _rename(
+        hass, _alexa(exposed=[key]), entry_id=entry.entry_id, name="Luz da cozinha"
+    )
+
+    device = dr.async_get(hass).async_get(device_id)
+    assert entry.title == "Luz da cozinha"
+    assert (device.name, device.name_by_user) == ("Luz da cozinha", None)
+    assert running.name == "Luz da cozinha"
+    announce.assert_awaited_once_with(hass, [key])
+    assert connection.send_result.call_args.args[1]["exposed"] == 1
+
+
+async def test_a_wifi_device_cannot_lose_its_name(hass):
+    entry, *_ = _wifi(hass)
+    connection, _ = await _rename(hass, None, entry_id=entry.entry_id, name=None)
+
+    assert connection.send_error.call_args.args[1] == "invalid_format"
+    assert entry.title == "Interruptor cozinha"
+
+
+async def test_a_new_title_alone_does_not_reconnect_the_device(hass):
+    entry, *_ = _wifi(hass)
+    hass.data[LOADED_SETTINGS] = {entry.entry_id: {**entry.data, **entry.options}}
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        await async_update_entry(hass, entry)
+        reload.assert_not_called()
+        hass.data[LOADED_SETTINGS][entry.entry_id] = {"host": "10.0.0.9"}
+        await async_update_entry(hass, entry)
+        reload.assert_called_once_with(entry.entry_id)

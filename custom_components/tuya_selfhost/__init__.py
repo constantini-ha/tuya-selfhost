@@ -42,6 +42,7 @@ from .zigbee_quirks import async_setup_zigbee_quirks
 
 _LOGGER = logging.getLogger(__name__)
 NOT_FOUND = "Configuration file for %s not found"
+LOADED_SETTINGS = f"{DOMAIN}_loaded_settings"
 
 
 def replace_unique_ids(entity_entry, device_id, conf_file, replacements):
@@ -1051,6 +1052,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await hass.config_entries.async_forward_entry_setups(entry, entities)
     await async_setup_services(hass, entities)
 
+    hass.data.setdefault(LOADED_SETTINGS, {})[entry.entry_id] = {
+        **entry.data,
+        **entry.options,
+    }
     entry.add_update_listener(async_update_entry)
 
     return True
@@ -1101,4 +1106,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
 
 async def async_update_entry(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.debug("Updating entry for device: %s", get_device_id(entry.data))
+    # A new name alone (a rename in the panel) needs no reconnect.
+    if hass.data.get(LOADED_SETTINGS, {}).get(entry.entry_id) == {
+        **entry.data,
+        **entry.options,
+    }:
+        return
     hass.config_entries.async_schedule_reload(entry.entry_id)

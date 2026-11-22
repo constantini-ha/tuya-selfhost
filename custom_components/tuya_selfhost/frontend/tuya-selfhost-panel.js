@@ -552,19 +552,23 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
+  // A Zigbee device falls back to its own name; a Wi-Fi device has no other, so empty keeps it.
   async _renameDevice(entry, text) {
     const name = text.trim() || null;
     this._renaming = null;
-    if (name === (entry.zha.user_given_name || null)) {
+    const current = entry.zha ? entry.zha.user_given_name || null : entry.title;
+    if (name === current || (!name && !entry.zha)) {
       setTimeout(() => this._render(), 150);
       return;
     }
     try {
-      const answer = await this._hass.callWS({
-        type: RENAME, device_id: entry.zha.device_reg_id, name,
-      });
+      const target = entry.zha
+        ? { device_id: entry.zha.device_reg_id }
+        : { entry_id: entry.entry_id };
+      const answer = await this._hass.callWS({ type: RENAME, ...target, name });
       this._flash = this._renamedText(answer);
-      await this._loadZigbee();
+      if (entry.zha) await this._loadZigbee();
+      else entry.title = name;
     } catch (err) {
       this._flash = this._t("rename_failed", { err: this._errText(err) });
     }
@@ -580,8 +584,8 @@ class TuyaSelfhostPanel extends HTMLElement {
   _deviceNameInput(entry) {
     const input = document.createElement("input");
     input.className = "rename";
-    input.value = entry.zha.user_given_name || "";
-    input.placeholder = entry.zha.name;
+    input.value = entry.zha ? entry.zha.user_given_name || "" : entry.title;
+    input.placeholder = entry.zha ? entry.zha.name : entry.title;
     input.maxLength = 60;
     input.enterKeyHint = "done";
     input.setAttribute("aria-label", this._t("rename_device"));
@@ -2409,7 +2413,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     const entry = this._entry();
     const remote = this._remoteOf(entry);
     const card = document.createElement("ha-card");
-    if (entry.zha && this._isAdmin()) card.appendChild(this._deviceTitle(entry));
+    if (this._isAdmin()) card.appendChild(this._deviceTitle(entry));
     else card.header = entry.title;
 
     const head = document.createElement("div");

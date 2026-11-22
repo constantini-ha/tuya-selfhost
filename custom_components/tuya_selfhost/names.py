@@ -15,6 +15,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
+from .helpers.config import get_device_id
 from .remote_keys import _alexa_config, async_announce_to_alexa
 
 try:
@@ -60,11 +61,37 @@ def _alexa_targets(hass: HomeAssistant, entity_ids: list[str]) -> tuple[list, li
     return exposed, pinned
 
 
+def _named_after(entities: er.EntityRegistry, device_id: str) -> list[str]:
+    """Keys spoken by the computed name, which carries the device's; the rest keep their own."""
+    return [
+        item.entity_id
+        for item in er.async_entries_for_device(entities, device_id)
+        if not item.aliases or next(iter(item.aliases)) is COMPUTED_NAME
+    ]
+
+
+def _rename_wifi_device(hass: HomeAssistant, entry, name: str) -> list[str]:
+    """Rename one of this integration's devices: its entry, the running device and its row."""
+    hass.config_entries.async_update_entry(entry, title=name)
+    device_id = get_device_id(entry.data)
+    runtime = (hass.data.get(DOMAIN) or {}).get(device_id) or {}
+    if (device := runtime.get("device")) is not None:
+        # Keys learned later are filed under the device by this name.
+        device.name = name
+    devices = dr.async_get(hass)
+    found = devices.async_get_device(identifiers={(DOMAIN, device_id)})
+    if found is None:
+        return []
+    devices.async_update_device(found.id, name=name, name_by_user=None)
+    return _named_after(er.async_get(hass), found.id)
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/rename",
         vol.Exclusive("entity_id", "target"): str,
         vol.Exclusive("device_id", "target"): str,
+        vol.Exclusive("entry_id", "target"): str,
         vol.Required("name"): NAME,
     }
 )
@@ -90,12 +117,16 @@ async def websocket_rename(hass, connection, msg):
             connection.send_error(msg["id"], "not_found", f"No device {device_id}")
             return
         devices.async_update_device(device_id, name_by_user=name)
-        # Only keys spoken by the computed name carry the device's; the rest keep their own.
-        renamed = [
-            item.entity_id
-            for item in er.async_entries_for_device(entities, device_id)
-            if not item.aliases or next(iter(item.aliases)) is COMPUTED_NAME
-        ]
+        renamed = _named_after(entities, device_id)
+    elif config_id := msg.get("entry_id"):
+        entry = hass.config_entries.async_get_entry(config_id)
+        if entry is None or entry.domain != DOMAIN:
+            connection.send_error(msg["id"], "not_found", f"No device {config_id}")
+            return
+        if name is None:
+            connection.send_error(msg["id"], "invalid_format", "A device needs a name")
+            return
+        renamed = _rename_wifi_device(hass, entry, name)
     else:
         connection.send_error(msg["id"], "invalid_format", "Name a key or a device")
         return

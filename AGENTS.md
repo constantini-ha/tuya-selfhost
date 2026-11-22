@@ -583,9 +583,13 @@ contradicts your instinct, trust the note.
 - Zigbee keys are their rows from `config/entity_registry/list` (`this._registry`), so
   they carry `name` and `config_entry_id` and get the same rename pencil as Wi-Fi keys.
   `_refreshEntries` reloads Zigbee too: it rebuilds `_byEntry` and used to wipe their keys.
-- A Zigbee device is renamed from its page title, `rename` with `device_id` =
-  `device_reg_id` (`name_by_user`). `ha-card`'s `header` takes text only, so the title is a
-  slotted `h1.card-header`, which `ha-card` styles like its own.
+- Every device is renamed from its page title. `ha-card`'s `header` takes text only, so the
+  title is a slotted `h1.card-header`, which `ha-card` styles like its own. Zigbee: `rename`
+  with `device_id` = `device_reg_id` (`name_by_user`; empty restores ZHA's name). Wi-Fi:
+  `rename` with `entry_id` sets the entry title, the running device's `name` (keys learned
+  later are filed under it) and the registry `name`, clearing `name_by_user`; it cannot be
+  emptied. Any entry update reloads the device, so setup keeps a snapshot of data + options
+  (`LOADED_SETTINGS`) and `async_update_entry` skips the reload when only the title changed.
 
 ### Zigbee quirks
 

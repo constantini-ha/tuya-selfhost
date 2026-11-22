@@ -133,9 +133,7 @@ class TuyaLocalDevice(object):
                 else:
                     self._api = tinytuya.Device(dev_id, address, local_key)
                     self._api_lock = asyncio.Lock()
-                    self._new_reserve = partial(
-                        _ble_transport, hass, dev_id, local_key
-                    )
+                    self._new_reserve = partial(_ble_transport, hass, dev_id, local_key)
                     standby = ble or reserve_address(hass, dev_id)
                     if standby:
                         self._api_standby = self._new_reserve(standby)
@@ -188,6 +186,10 @@ class TuyaLocalDevice(object):
     @property
     def name(self):
         return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
 
     @property
     def unique_id(self):
