@@ -214,6 +214,14 @@ ol.steps { margin:8px 0 0; padding-left:20px; font-size:13.5px; line-height:1.7;
   color:var(--secondary-text-color) }
 `;
 
+function* cardsIn(node) {
+  if (Array.isArray(node)) for (const item of node) yield* cardsIn(item);
+  else if (node && typeof node === "object") {
+    if (typeof node.type === "string") yield node;
+    for (const value of Object.values(node)) yield* cardsIn(value);
+  }
+}
+
 class TuyaSelfhostPanel extends HTMLElement {
   constructor() {
     super();
@@ -1454,45 +1462,54 @@ class TuyaSelfhostPanel extends HTMLElement {
     this._render();
   }
 
+  // Adds a card once: `same` tells whether a card already on the dashboard is this one.
+  async _cardToDashboard(card, same) {
+    let config = null;
+    try {
+      config = await this._hass.callWS({ type: "lovelace/config", url_path: null });
+    } catch (err) {
+      config = null;
+    }
+    if (!config || !Array.isArray(config.views) || !config.views.length) {
+      this._flash = this._t("dashboard_auto");
+    } else if ([...cardsIn(config.views)].some((other) => other.type === card.type && same(other))) {
+      this._flash = this._t("already_on_dashboard", { name: card.title });
+    } else {
+      const view = config.views[0];
+      if (view.sections) view.sections.push({ type: "grid", cards: [card] });
+      else (view.cards ||= []).push(card);
+      await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
+      this._flash = this._t("sent_to_dashboard", { name: card.title });
+    }
+    this._render();
+  }
+
   async _deviceToDashboard() {
     const entry = this._entry();
-    const config = await this._hass.callWS({ type: "lovelace/config", url_path: null });
-    const card = entry.zha
-      ? {
-          type: "custom:tuya-selfhost-device-card",
-          entities: (this._byEntry[entry.entry_id] || [])
-            .map((e) => e.entity_id)
-            .filter((id) => id.startsWith("switch.") || id.startsWith("light.")),
-          title: entry.title,
-        }
-      : {
-          type: "custom:tuya-selfhost-device-card",
-          entry_id: entry.entry_id,
-          title: entry.title,
-        };
-    const view = config.views[0];
-    if (view.sections) view.sections.push({ type: "grid", cards: [card] });
-    else (view.cards ||= []).push(card);
-    await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
-    this._flash = this._t("sent_to_dashboard", { name: entry.title });
-    this._render();
+    const type = "custom:tuya-selfhost-device-card";
+    if (!entry.zha) {
+      await this._cardToDashboard(
+        { type, entry_id: entry.entry_id, title: entry.title },
+        (other) => other.entry_id === entry.entry_id
+      );
+      return;
+    }
+    const entities = (this._byEntry[entry.entry_id] || [])
+      .map((e) => e.entity_id)
+      .filter((id) => id.startsWith("switch.") || id.startsWith("light."));
+    await this._cardToDashboard(
+      { type, entities, title: entry.title },
+      (other) => Array.isArray(other.entities) && entities.every((id) => other.entities.includes(id))
+    );
   }
 
   async _toDashboard() {
     const control = this._control();
-    const config = await this._hass.callWS({ type: "lovelace/config", url_path: null });
-    const card = {
-      type: "custom:tuya-selfhost-remote-card",
-      entity: this._remoteOf(this._entry()),
-      control: control.id,
-      title: control.name,
-    };
-    const view = config.views[0];
-    if (view.sections) view.sections.push({ type: "grid", cards: [card] });
-    else (view.cards ||= []).push(card);
-    await this._hass.callWS({ type: "lovelace/config/save", url_path: null, config });
-    this._flash = this._t("sent_to_dashboard", { name: control.name });
-    this._render();
+    const entity = this._remoteOf(this._entry());
+    await this._cardToDashboard(
+      { type: "custom:tuya-selfhost-remote-card", entity, control: control.id, title: control.name },
+      (other) => other.entity === entity && other.control === control.id
+    );
   }
 
   // ---------- Tuya account ----------

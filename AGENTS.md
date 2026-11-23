@@ -118,6 +118,11 @@ contradicts your instinct, trust the note.
 - A card must not guess an entity id from a name — a rename or a clash breaks it
   silently. `tuya_selfhost/layout/entities` reads the registry and answers which
   entity each control and key became.
+- **"Add to dashboard" adds a card once.** Both buttons go through `_cardToDashboard(card, same)`, which
+  walks every view of the default dashboard (`cardsIn`) and adds nothing when a card of the same type
+  already shows the same thing (`entry_id`, the same ZHA entities, or `entity` + `control`). The owner
+  pressed it twice and got two cards (23/11/2026). An automatic dashboard has no views to write to and
+  gets the `dashboard_auto` message.
 - Destructive actions confirm in place: the row or a banner swaps to
   "yes / cancel" rather than opening a dialog. See `_confirmControl` and
   `_confirmButton`.

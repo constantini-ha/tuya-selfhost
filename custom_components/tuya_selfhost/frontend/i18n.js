@@ -44,6 +44,8 @@ const STRINGS = {
       "remote in the exact state you want first — an air conditioner sends its " +
       "whole state with every press.",
     sent_to_dashboard: "“{name}” is on your dashboard.",
+    already_on_dashboard: "“{name}” is already on your dashboard; nothing was added.",
+    dashboard_auto: "Your dashboard is automatic. Take control of it first, then add the card.",
     no_devices: "No Tuya Selfhost device configured yet.",
     no_keys: "This device has no keys to show.",
     all_off_state: "All off",
@@ -393,6 +395,8 @@ const STRINGS = {
       "Deixe o controle físico no estado exato antes de apertar — controle de ar " +
       "transmite o estado inteiro a cada toque.",
     sent_to_dashboard: "“{name}” foi para o seu painel.",
+    already_on_dashboard: "“{name}” já está no seu painel; nada foi adicionado.",
+    dashboard_auto: "Seu painel é automático. Assuma o controle dele primeiro e depois adicione o card.",
     no_devices: "Nenhum aparelho Tuya Selfhost configurado ainda.",
     no_keys: "Este aparelho não tem teclas para mostrar.",
     all_off_state: "Tudo desligado",
@@ -742,6 +746,8 @@ const STRINGS = {
       "Deja el mando físico en el estado exacto antes de pulsar — un aire acondicionado " +
       "transmite su estado completo en cada pulsación.",
     sent_to_dashboard: "“{name}” está en tu panel.",
+    already_on_dashboard: "“{name}” ya está en tu panel; no se añadió nada.",
+    dashboard_auto: "Tu panel es automático. Toma el control primero y luego añade la tarjeta.",
     no_devices: "Aún no hay ningún dispositivo Tuya Selfhost configurado.",
     no_keys: "Este dispositivo no tiene teclas que mostrar.",
     all_off_state: "Todo apagado",
