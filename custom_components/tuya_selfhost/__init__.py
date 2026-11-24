@@ -35,6 +35,7 @@ from .ble.reserve import async_start_radios, async_stop_radios
 from .alexa_status import async_setup_alexa_status
 from .names import async_setup_names
 from .presses import async_setup_presses
+from .zigbee_joins import async_setup_zigbee_joins
 from .notices import async_start_notices, async_stop_notices
 from .remote_card import async_setup_remote_card
 from .cloud import async_restore_auth
@@ -1019,6 +1020,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     async_setup_names(hass)
     async_setup_alexa_status(hass)
     async_setup_presses(hass)
+    async_setup_zigbee_joins(hass)
     await async_restore_auth(hass)
     await async_setup_cloud_api(hass)
     await async_start_notices(hass)

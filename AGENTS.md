@@ -612,6 +612,7 @@ contradicts your instinct, trust the note.
   all-off work unchanged. The dashboard card takes `entities` instead of
   `entry_id`, which it already supported.
 - A silent Zigbee device (`available: false`) shows "Silent" on the device list and on its page, with when it was last heard and what brings it back. Its battery sensor keeps its last value, so without this the page looked healthy (owner's complaint, 24/11). `last_seen` comes as UTC without a zone: append `Z` before `new Date`.
+- **ZHA lists a device only after its interview ends.** A battery button sleeps mid-interview, so the pairing screen used to show nothing and end with "nothing joined" although it had joined (24/11/2026, SNZB-01P). `zigbee_joins.py` follows ZHA's `zha_gateway_message` dispatcher signal (`device_joined` → `raw_device_initialized` → `device_fully_initialized`; names spelled out, not imported from `zha`) and WS `tuya_selfhost/zigbee/joins` returns them with the server clock; the panel shows the ones of this window still being set up and tells to press once a second.
 - **Pairing is a service, not a websocket command.** `zha/devices/permit` is
   gone; call `zha.permit` with a `duration`, and `zha.permit` with `duration: 0`
   to close the window early. Joins arrive through an in-process dispatcher

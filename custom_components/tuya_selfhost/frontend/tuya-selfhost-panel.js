@@ -1838,13 +1838,34 @@ class TuyaSelfhostPanel extends HTMLElement {
       this._render();
       return;
     }
+    const joins = await this._zigbeeJoins();
     this._pairing = {
       left: 120,
       found: [],
       before: new Set((this._zigbee || []).map((d) => d.entry_id)),
+      // Server time, so a phone with a wrong clock still tells new joins apart.
+      since: joins ? joins.now : null,
+      waiting: [],
     };
     this._render();
     this._pairTick();
+  }
+
+  async _zigbeeJoins() {
+    try {
+      return await this._hass.callWS({ type: "tuya_selfhost/zigbee/joins" });
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // Joined during this window but not listed yet: their interview is still going.
+  _waitingJoins(joins) {
+    if (!joins || this._pairing.since == null) return [];
+    const listed = new Set((this._zigbee || []).map((d) => d.zha.ieee));
+    return joins.joins.filter(
+      (join) => join.at >= this._pairing.since && join.stage !== "done" && !listed.has(join.ieee)
+    );
   }
 
   _pairTick() {
@@ -1853,6 +1874,8 @@ class TuyaSelfhostPanel extends HTMLElement {
       if (!this._pairing) return;
       this._pairing.left -= 5;
       await this._loadZigbee();
+      if (!this._pairing) return;
+      this._pairing.waiting = this._waitingJoins(await this._zigbeeJoins());
       for (const device of this._zigbee) {
         if (
           !this._pairing.before.has(device.entry_id) &&
@@ -1866,10 +1889,11 @@ class TuyaSelfhostPanel extends HTMLElement {
         return;
       }
       const found = this._pairing.found;
+      const waiting = this._pairing.waiting.length;
       this._pairing = null;
       this._flash = found.length
         ? this._t("zigbee_joined", { names: found.join(", ") })
-        : this._t("zigbee_none");
+        : this._t(waiting ? "zigbee_unfinished" : "zigbee_none");
       this._render();
     }, 5000);
   }
@@ -2402,6 +2426,18 @@ class TuyaSelfhostPanel extends HTMLElement {
             names: this._pairing.found.join(", "),
           })}</div>`
         );
+      for (const join of this._pairing.waiting) {
+        const line = document.createElement("div");
+        line.className = "net";
+        line.innerHTML = `<div class="grow"><div></div><div class="muted"></div></div>
+          <span class="pill warn"></span>`;
+        line.querySelector(".grow > div").textContent = join.model
+          ? this._t("zigbee_joining_model", { model: join.model })
+          : this._t("zigbee_joining");
+        line.querySelector(".muted").textContent = this._t("zigbee_keep_awake");
+        line.querySelector(".pill").textContent = this._t("zigbee_interview");
+        add.appendChild(line);
+      }
       const stop = document.createElement("button");
       stop.className = "act ghost";
       stop.style.marginTop = "10px";
