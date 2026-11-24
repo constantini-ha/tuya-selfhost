@@ -111,6 +111,9 @@ const STRINGS = {
     zigbee_remove_confirm: "Remove “{name}” from the Zigbee network?",
     zigbee_here: "Answering",
     zigbee_gone: "Silent",
+    zigbee_gone_since: "Home Assistant has heard nothing from it since {when}.",
+    zigbee_gone_help:
+      "A battery device comes back by itself when you press it and it reaches the network. If it does not, bring it near the Zigbee stick or put a plugged-in Zigbee device on the way: only those pass the signal along.",
     zigbee_deeper:
       "Bindings, groups and clusters live on Home Assistant's own Zigbee page.",
     zigbee_open_ha: "Open Zigbee in Home Assistant",
@@ -462,6 +465,9 @@ const STRINGS = {
     zigbee_remove_confirm: "Remover “{name}” da rede Zigbee?",
     zigbee_here: "Respondendo",
     zigbee_gone: "Calado",
+    zigbee_gone_since: "O Home Assistant não recebe nada dele desde {when}.",
+    zigbee_gone_help:
+      "Aparelho a pilha volta sozinho quando você aperta e ele alcança a rede. Se não voltar, leve-o para perto do pendrive Zigbee ou ponha no caminho um aparelho Zigbee ligado na tomada: só esses repassam o sinal.",
     zigbee_deeper:
       "Vínculos, grupos e clusters ficam na página de Zigbee do próprio Home Assistant.",
     zigbee_open_ha: "Abrir o Zigbee no Home Assistant",
@@ -813,6 +819,9 @@ const STRINGS = {
     zigbee_remove_confirm: "¿Quitar “{name}” de la red Zigbee?",
     zigbee_here: "Responde",
     zigbee_gone: "Callado",
+    zigbee_gone_since: "Home Assistant no recibe nada de él desde {when}.",
+    zigbee_gone_help:
+      "Un aparato a pilas vuelve solo cuando lo pulsas y alcanza la red. Si no vuelve, acércalo al pendrive Zigbee o pon en el camino un aparato Zigbee enchufado: solo esos pasan la señal.",
     zigbee_deeper:
       "Los vínculos, grupos y clusters están en la página de Zigbee del propio Home Assistant.",
     zigbee_open_ha: "Abrir Zigbee en Home Assistant",

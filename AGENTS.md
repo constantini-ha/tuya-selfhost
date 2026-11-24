@@ -605,6 +605,7 @@ contradicts your instinct, trust the note.
   the same shape as a config entry, so the device page, the tiles, all-on and
   all-off work unchanged. The dashboard card takes `entities` instead of
   `entry_id`, which it already supported.
+- A silent Zigbee device (`available: false`) shows "Silent" on the device list and on its page, with when it was last heard and what brings it back. Its battery sensor keeps its last value, so without this the page looked healthy (owner's complaint, 24/11). `last_seen` comes as UTC without a zone: append `Z` before `new Date`.
 - **Pairing is a service, not a websocket command.** `zha/devices/permit` is
   gone; call `zha.permit` with a `duration`, and `zha.permit` with `duration: 0`
   to close the window early. Joins arrive through an in-process dispatcher

@@ -1909,6 +1909,33 @@ class TuyaSelfhostPanel extends HTMLElement {
     return null;
   }
 
+  _zigbeeGone(device) {
+    const box = document.createElement("div");
+    box.className = "pad";
+    box.style.paddingTop = "0";
+    const pill = document.createElement("span");
+    pill.className = "pill bad";
+    pill.textContent = this._t("zigbee_gone");
+    const stamp = device.zha.last_seen;
+    // ZHA sends UTC without a zone; read bare, the browser would take it as local.
+    const seen = stamp ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(stamp) ? stamp : stamp + "Z") : null;
+    const lines = document.createElement("div");
+    lines.className = "muted";
+    lines.style.marginTop = "8px";
+    lines.textContent = [
+      seen && !isNaN(seen)
+        ? this._t("zigbee_gone_since", {
+            when: seen.toLocaleString(this._hass.language, { dateStyle: "short", timeStyle: "short" }),
+          })
+        : "",
+      this._t("zigbee_gone_help"),
+    ]
+      .filter(Boolean)
+      .join(" ");
+    box.append(pill, lines);
+    return box;
+  }
+
   _zigbeeFacts(device) {
     const info = device.zha;
     const facts = [];
@@ -2572,6 +2599,7 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     for (const device of this._zigbee || []) {
       const entities = this._byEntry[device.entry_id] || [];
+      const gone = device.zha.available === false;
       const row = document.createElement("div");
       row.className = "dev";
       row.innerHTML = `
@@ -2580,7 +2608,7 @@ class TuyaSelfhostPanel extends HTMLElement {
           <div>${device.title}</div>
           <div class="muted">${this._t("entities", { n: entities.length })}</div>
         </div>
-        <span class="pill">${this._t("zigbee_pill")}</span>`;
+        <span class="pill${gone ? " bad" : ""}">${this._t(gone ? "zigbee_gone" : "zigbee_pill")}</span>`;
       row.style.cursor = "pointer";
       row.addEventListener("click", () => {
         this._open = device.entry_id;
@@ -2636,6 +2664,7 @@ class TuyaSelfhostPanel extends HTMLElement {
       facts.style.paddingTop = "0";
       facts.textContent = this._zigbeeFacts(entry);
       card.appendChild(facts);
+      if (entry.zha.available === false) card.appendChild(this._zigbeeGone(entry));
     }
 
     const entities = this._byEntry[entry.entry_id] || [];
