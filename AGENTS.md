@@ -595,6 +595,12 @@ contradicts your instinct, trust the note.
 - Release notes are written in English, Portuguese and Spanish, in that order,
   separated by `---`.
 
+### The Alexa tab
+
+- Leads with what Home Assistant can see (`alexa_status.py`, WS `tuya_selfhost/alexa/status`, admin only): the address the skill's Lambda must call (external URL + `/api/alexa/smart_home`), the account link (refresh tokens whose `client_id` is an Alexa region: pitangui = North America, layla = Europe, alexa.amazon.co.jp = Far East; `last_used_at` is Alexa renewing its access, not each command), and whether state reports flow (`supports_auth`, `authorized`, `is_reporting_states`). The Lambda itself (ARN, env vars) lives in the user's AWS account and cannot be read from here; say so instead of guessing.
+- The YAML generator sits folded under "Set up from scratch": the owner's `alexa:` block is hand-written, and pasting the generated one over it would lose his settings.
+- Running the suite locally needs `uv run --with pycryptodome --with segno==1.6.6 pytest tests --ignore=tests/test_ble_reserve.py` (that file pulls a chain of USB/ESPHome deps). 58 tests already fail on main without any change (24/11/2026); compare against a stash before blaming a change.
+
 ### Zigbee in this panel
 
 - Zigbee devices belong to Home Assistant's own ZHA integration, and the panel

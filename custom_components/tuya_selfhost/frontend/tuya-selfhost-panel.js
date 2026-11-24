@@ -210,6 +210,7 @@ pre.mono { margin:0; padding:12px; border-radius:10px; overflow:auto; max-height
   background:var(--code-editor-background-color,rgba(127,127,127,.12)) }
 a.link { color:var(--primary-color); text-decoration:none; font-size:14px }
 a.link:hover { text-decoration:underline }
+details.setup summary { cursor:pointer; font-size:15px; font-weight:500 }
 ol.steps { margin:8px 0 0; padding-left:20px; font-size:13.5px; line-height:1.7;
   color:var(--secondary-text-color) }
 `;
@@ -2097,14 +2098,14 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   async _alexaLoad() {
     this._alexa = "loading";
-    try {
-      const result = await this._hass.callService(
-        "tuya_selfhost", "alexa_config", {}, undefined, false, true
-      );
-      this._alexa = (result && result.response) || null;
-    } catch (err) {
-      this._alexa = null;
-    }
+    const [config, status] = await Promise.all([
+      this._hass
+        .callService("tuya_selfhost", "alexa_config", {}, undefined, false, true)
+        .then((result) => (result && result.response) || null)
+        .catch(() => null),
+      this._hass.callWS({ type: "tuya_selfhost/alexa/status" }).catch(() => null),
+    ]);
+    this._alexa = { ...(config || {}), status };
     this._render();
   }
 
@@ -2498,38 +2499,19 @@ class TuyaSelfhostPanel extends HTMLElement {
 
   _tabAlexa() {
     const box = document.createElement("div");
-    const head = document.createElement("div");
-    head.className = "block";
-    head.innerHTML = `<div class="muted">${this._t("alexa_intro")}</div>
-      <ol class="steps">${["alexa_s1", "alexa_s2", "alexa_s3", "alexa_s4", "alexa_s5"]
-        .map((k) => `<li>${this._t(k)}</li>`)
-        .join("")}</ol>`;
-    box.appendChild(head);
-
     if (this._alexa === undefined) {
       this._alexa = "loading";
       setTimeout(() => this._alexaLoad(), 0);
     }
-    const body = document.createElement("div");
-    body.className = "block";
     if (this._alexa === "loading" || this._alexa === undefined) {
-      body.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
-      box.appendChild(body);
+      const wait = document.createElement("div");
+      wait.className = "block";
+      wait.innerHTML = `<div class="muted">${this._t("loading")}</div>`;
+      box.appendChild(wait);
       return box;
     }
-    const yaml = (this._alexa && this._alexa.yaml) || "";
-    body.innerHTML = `<h3>${this._t("alexa_yaml")}</h3>
-      <div class="muted" style="margin-bottom:10px">${this._t("alexa_count", {
-        n: (this._alexa && this._alexa.entity_count) || 0,
-      })}</div>
-      <pre class="mono">${yaml.replace(/</g, "&lt;")}</pre>`;
-    const copy = document.createElement("button");
-    copy.className = "act";
-    copy.style.marginTop = "10px";
-    copy.textContent = this._t("copy_yaml");
-    copy.addEventListener("click", () => this._copy(yaml, this._t("copied")));
-    body.appendChild(copy);
-    box.appendChild(body);
+    const status = this._alexa.status;
+    if (status) box.appendChild(this._alexaStatus(status));
 
     const keys = document.createElement("div");
     keys.className = "block";
@@ -2543,14 +2525,116 @@ class TuyaSelfhostPanel extends HTMLElement {
     keys.appendChild(send);
     box.appendChild(keys);
 
+    const setup = document.createElement("details");
+    setup.className = "block setup";
+    // Open by default only while there is nothing to look at above.
+    setup.open = !status || !status.skill;
+    const yaml = this._alexa.yaml || "";
+    setup.innerHTML = `<summary>${this._t("alexa_setup")}</summary>
+      <div class="muted" style="margin-top:10px">${this._t("alexa_intro")}</div>
+      <ol class="steps">${["alexa_s1", "alexa_s2", "alexa_s3", "alexa_s4", "alexa_s5"]
+        .map((k) => `<li>${this._t(k)}</li>`)
+        .join("")}</ol>
+      <h3 style="margin-top:16px">${this._t("alexa_yaml")}</h3>
+      <div class="muted" style="margin-bottom:10px">${this._t("alexa_yaml_hint")}</div>
+      <pre class="mono">${yaml.replace(/</g, "&lt;")}</pre>`;
+    const copy = document.createElement("button");
+    copy.className = "act";
+    copy.style.marginTop = "10px";
+    copy.textContent = this._t("copy_yaml");
+    copy.addEventListener("click", () => this._copy(yaml, this._t("copied")));
+    setup.appendChild(copy);
     const guide = document.createElement("div");
-    guide.className = "block";
-    guide.innerHTML = `<h3>${this._t("guide_title")}</h3>
-      <a class="link" href="${this._t("guide_url")}" target="_blank" rel="noreferrer">${this._t(
-        "guide_link"
-      )}</a>`;
-    box.appendChild(guide);
+    guide.style.marginTop = "14px";
+    guide.innerHTML = `<a class="link" href="${this._t("guide_url")}" target="_blank" rel="noreferrer">${this._t(
+      "guide_link"
+    )}</a>`;
+    setup.appendChild(guide);
+    box.appendChild(setup);
     return box;
+  }
+
+  _alexaStatus(status) {
+    const when = (iso) =>
+      new Date(iso).toLocaleString(this._hass.language, { dateStyle: "short", timeStyle: "short" });
+    const skill = status.skill;
+    const link = status.link;
+    const rows = [];
+    rows.push({
+      title: this._t("alexa_lambda"),
+      value: status.base_url,
+      text: status.base_url ? this._t("alexa_lambda_hint") : this._t("alexa_lambda_none"),
+      pill: status.base_url ? null : ["warn", "alexa_no_url"],
+    });
+    rows.push({
+      title: this._t("alexa_skill"),
+      text: skill
+        ? this._t("alexa_skill_on", { locale: skill.locale || "—", n: skill.exposed ?? "—" })
+        : this._t("alexa_skill_off"),
+      pill: skill ? ["good", "alexa_ready"] : ["bad", "alexa_missing"],
+    });
+    rows.push({
+      title: this._t("alexa_link"),
+      text: link
+        ? this._t("alexa_link_on", {
+            when: when(link.linked_at),
+            user: link.user,
+            region: this._t(`alexa_region_${link.region}`),
+            used: when(link.used_at),
+          })
+        : this._t("alexa_link_off"),
+      pill: link ? ["good", "alexa_linked"] : ["bad", "alexa_unlinked"],
+    });
+    if (skill) {
+      const report = skill.reporting
+        ? ["good", "alexa_report_on", "alexa_report_on_text"]
+        : skill.can_report
+          ? ["warn", "alexa_report_wait", "alexa_report_wait_text"]
+          : ["bad", "alexa_report_off", "alexa_report_off_text"];
+      rows.push({
+        title: this._t("alexa_report"),
+        text: this._t(report[2], {
+          region: skill.events_region ? this._t(`alexa_region_${skill.events_region}`) : "—",
+        }),
+        pill: [report[0], report[1]],
+      });
+    }
+    const block = document.createElement("div");
+    block.className = "block";
+    block.innerHTML = `<h3>${this._t("alexa_status")}</h3>`;
+    for (const row of rows) {
+      const line = document.createElement("div");
+      line.className = "net";
+      const grow = document.createElement("div");
+      grow.className = "grow";
+      const title = document.createElement("div");
+      title.textContent = row.title;
+      grow.appendChild(title);
+      if (row.value) {
+        const value = document.createElement("button");
+        value.className = "copyable mono";
+        value.textContent = row.value;
+        value.setAttribute("aria-label", this._t("copy_value", { value: row.value }));
+        value.addEventListener("click", () => this._copy(row.value, this._t("copied")));
+        const holder = document.createElement("div");
+        holder.style.margin = "4px 0 2px";
+        holder.appendChild(value);
+        grow.appendChild(holder);
+      }
+      const text = document.createElement("div");
+      text.className = "muted";
+      text.textContent = row.text;
+      grow.appendChild(text);
+      line.appendChild(grow);
+      if (row.pill) {
+        const pill = document.createElement("span");
+        pill.className = `pill ${row.pill[0]}`;
+        pill.textContent = this._t(row.pill[1]);
+        line.appendChild(pill);
+      }
+      block.appendChild(line);
+    }
+    return block;
   }
 
   _renderList() {
