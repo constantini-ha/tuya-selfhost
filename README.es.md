@@ -75,7 +75,7 @@ viajan con ella.
 | **Wi-Fi, directo** | El grueso del catálogo: interruptores, enchufes, luces, climatización, ventiladores, cerraduras, sensores, persianas, aspiradoras, termos |
 | **Zigbee tras una pasarela Tuya** | Subdispositivos alcanzados por el hub, configurados con su `device_cid`. La pasarela mantiene su nube; los subdispositivos no la necesitan |
 | **IR y RF por blaster** | Cualquier aparato, copiando su mando original — ver abajo |
-| **Bluetooth** | Todavía no. Los módulos Wi-Fi lo anuncian y la base está en preparación |
+| **Bluetooth, como reserva** | Aparatos Wi-Fi cuyo módulo también tiene Bluetooth. Cuando el Wi-Fi no responde, la orden va por el Bluetooth del propio aparato, encontrado solo; nada que configurar. Los aparatos solo Bluetooth aún no son compatibles: mira [tuya_ble](https://github.com/PlusPlus-ua/ha_tuya_ble/) |
 
 ¿Falta el tuyo? El log del config flow imprime lo necesario para abrir una
 [issue](https://github.com/constantini-ha/tuya-selfhost/issues), y escribir una

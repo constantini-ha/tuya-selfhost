@@ -74,7 +74,7 @@ entity_ids, histórico, área e códigos aprendidos vão junto.
 | **Wi-Fi, direto** | O grosso do catálogo: interruptores, tomadas, luzes, climatização, ventiladores, fechaduras, sensores, cortinas, aspiradores, aquecedores |
 | **Zigbee atrás de um gateway Tuya** | Sub-aparelhos alcançados pelo hub, configurados com o `device_cid`. O gateway mantém a nuvem dele; os sub-aparelhos não precisam |
 | **IR e RF por blaster** | Qualquer aparelho, copiando o controle original — veja abaixo |
-| **Bluetooth** | Ainda não. Os módulos Wi-Fi anunciam BLE, e a base está sendo preparada |
+| **Bluetooth, como reserva** | Aparelhos Wi-Fi cujo módulo também tem Bluetooth. Quando o Wi-Fi não responde, o comando vai pelo Bluetooth do próprio aparelho, encontrado sozinho; nada a configurar. Aparelho só Bluetooth ainda não é suportado: veja o [tuya_ble](https://github.com/PlusPlus-ua/ha_tuya_ble/) |
 
 Não achou o seu? O log do config flow mostra os dados para abrir uma
 [issue](https://github.com/constantini-ha/tuya-selfhost/issues), e escrever uma

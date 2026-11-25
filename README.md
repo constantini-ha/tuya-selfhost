@@ -74,7 +74,7 @@ deleting it: entity ids, history, area and learned codes all come along.
 | **Wi-Fi, directly** | The bulk of the catalogue: switches, plugs, lights, climate, fans, locks, sensors, covers, vacuums, water heaters |
 | **Zigbee behind a Tuya gateway** | Sub-devices reached through the hub, configured with their `device_cid`. The gateway keeps its cloud connection; the sub-devices do not need one |
 | **IR and RF through a blaster** | Any appliance, by copying its original remote — see below |
-| **Bluetooth** | Not yet. The Wi-Fi modules do advertise it, and the groundwork is under way |
+| **Bluetooth, as a reserve** | Wi-Fi devices whose module also has Bluetooth. When Wi-Fi does not answer, the command goes over the device's own Bluetooth radio, found by itself; no setup. Devices that are Bluetooth only are not supported yet: see [tuya_ble](https://github.com/PlusPlus-ua/ha_tuya_ble/) |
 
 Yours missing? The config flow log prints what you need for an
 [issue](https://github.com/constantini-ha/tuya-selfhost/issues), and writing a new
