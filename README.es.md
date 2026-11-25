@@ -37,6 +37,9 @@
 Una vez configurado, puedes **bloquear el dispositivo en el router** y sigue
 respondiendo. La acción `network_report` lista la MAC de cada uno justo para eso.
 
+Y si el Wi-Fi se cae, el dispositivo cuyo módulo también tiene **Bluetooth** sigue
+recibiendo la orden por él. La radio se encuentra sola; no hay nada que configurar.
+
 ## Instalación
 
 [![Abrir en Marketplace](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=constantini-ha&repository=tuya-selfhost&category=integration)

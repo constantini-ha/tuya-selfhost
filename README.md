@@ -37,6 +37,9 @@
 Once a device is set up you can **block it at the router** and it carries on
 answering. The `network_report` action lists every device's MAC for exactly that.
 
+And if Wi-Fi drops, a device whose module also has **Bluetooth** still takes the
+command over it. The radio is found by itself; there is nothing to set up.
+
 ## Installation
 
 [![Open in Marketplace](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=constantini-ha&repository=tuya-selfhost&category=integration)
