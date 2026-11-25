@@ -65,6 +65,9 @@ The QR login only fetches the `local_key`; the key is stored and the session is
 not. Field by field in **[CONFIGURATION.md](CONFIGURATION.md)**, and how to find
 the values by hand in **[DEVICE_DETAILS.md](DEVICE_DETAILS.md)**.
 
+Signed in once? The gear in the panel has an **Add device** tab listing the
+account's devices that are not here yet, each with its own **Add** button.
+
 **Re-paired the device in the app?** Use **Reconfigure** on the entry instead of
 deleting it: entity ids, history, area and learned codes all come along.
 
@@ -75,6 +78,7 @@ deleting it: entity ids, history, area and learned codes all come along.
 | How it connects | What that covers |
 | --- | --- |
 | **Wi-Fi, directly** | The bulk of the catalogue: switches, plugs, lights, climate, fans, locks, sensors, covers, vacuums, water heaters |
+| **Zigbee on Home Assistant's own stick** | Paired and listed from the panel, next to everything else. Zigbee buttons get shortcuts — see below |
 | **Zigbee behind a Tuya gateway** | Sub-devices reached through the hub, configured with their `device_cid`. The gateway keeps its cloud connection; the sub-devices do not need one |
 | **IR and RF through a blaster** | Any appliance, by copying its original remote — see below |
 | **Bluetooth, as a reserve** | Wi-Fi devices whose module also has Bluetooth. When Wi-Fi does not answer, the command goes over the device's own Bluetooth radio, found by itself; no setup. Devices that are Bluetooth only are not supported yet: see [tuya_ble](https://github.com/PlusPlus-ua/ha_tuya_ble/) |
@@ -111,19 +115,33 @@ lists each device with its address and MAC, ready to block on the router.
 **Bluetooth** shows the Tuya radios Home Assistant hears right now, with their
 signal — a Wi-Fi device that also has Bluetooth appears there, since that is its
 reserve when Wi-Fi drops. **Zigbee** pairs and lists what hangs on Home
-Assistant's own Zigbee network.
+Assistant's own Zigbee network: a device still being set up while pairing shows
+as such, and one that stopped answering shows as silent.
 
 Some Tuya Zigbee devices pair and then show no keys, because Home Assistant does
 not know their model yet. The fix for those ships here and loads by itself, with
 nothing to install or configure. Covered today: the Nova Digital SA-6 six-gang
 wall switch (`_TZE28C1000000_gxbdnfrh`), which gains all six keys.
 
-## Naming the keys
+## Names
 
-On a device's page, tap the name under a key to rename it; the same field is in
-the device's settings. The name goes to Home Assistant's entity registry, so
-dashboards and voice assistants get it too. An empty name brings the original
-back.
+On a device's page, the pencil next to its title renames the device, and the
+name under a key renames that key; the same field is in the device's settings.
+The name goes to Home Assistant's registry, so dashboards get it too, and Alexa
+is told at once. An empty key name brings the original back.
+
+## Zigbee buttons
+
+Open a Zigbee button and tap **New shortcut**: press the button the way you mean
+to use it (one tap, two taps or hold), pick the keys it should switch and
+whether it toggles, turns on or turns off. It is saved as an ordinary Home
+Assistant automation, and **Edit** reopens it in the same short form.
+
+## Dashboard
+
+**To dashboard** on a device's page, or **Add to dashboard** on a remote built in the panel, puts
+its card on your main dashboard (`custom:tuya-selfhost-device-card`,
+`custom:tuya-selfhost-remote-card`). A card already there is not added twice.
 
 ## Scenes
 
@@ -150,10 +168,13 @@ the panel closed and can be paused from the list.
 
 ## Alexa
 
-The **Alexa configuration** action builds the whole `alexa:` block from your
-entities, ready to paste. The guide covers the self-hosted skill without Nabu Casa
-and the proactive reporting catch, which is what makes the Alexa app track state
-for real: **[ALEXA.md](ALEXA.md)** · [pt-BR](ALEXA.pt-BR.md) · [es](ALEXA.es.md)
+The gear's **Alexa** tab shows how Alexa reaches this home: the address the
+skill's Lambda must call, the account link, and whether change notices flow back
+to the Alexa app. Learned keys, scenes and renames reach Alexa as soon as they
+are saved. Under **Set up from scratch** it builds the whole `alexa:` block from
+your entities. The guide covers the self-hosted skill without Nabu Casa and the
+proactive reporting catch, which is what makes the Alexa app track state for
+real: **[ALEXA.md](ALEXA.md)** · [pt-BR](ALEXA.pt-BR.md) · [es](ALEXA.es.md)
 
 ## When something breaks
 
@@ -166,6 +187,7 @@ blasters: **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
 | --- | --- |
 | `tuya_selfhost.network_report` | Lists every device's IP and MAC, and which are safe to cut off the internet |
 | `tuya_selfhost.alexa_config` | Generates the complete `alexa:` block from your entities |
+| `tuya_selfhost.alexa_announce` | Hands every learned key and panel scene to Alexa, without waiting for a discovery |
 | `tuya_selfhost.send_learned_ir_command` | Fires a learned code through an infrared emitter |
 
 ## Contributing

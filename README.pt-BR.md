@@ -65,6 +65,10 @@ O login por QR serve só para buscar a `local_key`; ela fica salva e a sessão n
 Campo a campo em **[CONFIGURATION.md](CONFIGURATION.md)**, e como achar os dados na
 mão em **[DEVICE_DETAILS.md](DEVICE_DETAILS.md)**.
 
+Já entrou com a conta uma vez? A engrenagem do painel tem a aba **Adicionar
+aparelho**, com os aparelhos da conta que ainda não estão aqui, cada um com o
+seu botão **Adicionar**.
+
 **Re-pareou o aparelho no app?** Use **Reconfigurar** na entrada em vez de apagá-la:
 entity_ids, histórico, área e códigos aprendidos vão junto.
 
@@ -75,6 +79,7 @@ entity_ids, histórico, área e códigos aprendidos vão junto.
 | Como conecta | O que cobre |
 | --- | --- |
 | **Wi-Fi, direto** | O grosso do catálogo: interruptores, tomadas, luzes, climatização, ventiladores, fechaduras, sensores, cortinas, aspiradores, aquecedores |
+| **Zigbee no pendrive do próprio Home Assistant** | Pareados e listados pelo painel, junto com o resto. Botões Zigbee ganham atalhos — veja abaixo |
 | **Zigbee atrás de um gateway Tuya** | Sub-aparelhos alcançados pelo hub, configurados com o `device_cid`. O gateway mantém a nuvem dele; os sub-aparelhos não precisam |
 | **IR e RF por blaster** | Qualquer aparelho, copiando o controle original — veja abaixo |
 | **Bluetooth, como reserva** | Aparelhos Wi-Fi cujo módulo também tem Bluetooth. Quando o Wi-Fi não responde, o comando vai pelo Bluetooth do próprio aparelho, encontrado sozinho; nada a configurar. Aparelho só Bluetooth ainda não é suportado: veja o [tuya_ble](https://github.com/PlusPlus-ua/ha_tuya_ble/) |
@@ -111,7 +116,9 @@ lista cada aparelho com endereço e MAC, pronto para bloquear no roteador.
 **Bluetooth** mostra os rádios Tuya que o Home Assistant está ouvindo agora,
 com o sinal — o aparelho de Wi-Fi que também tem Bluetooth aparece ali, porque
 essa é a reserva dele quando o Wi-Fi cai. **Zigbee** pareia e lista o que está
-na rede Zigbee do próprio Home Assistant.
+na rede Zigbee do próprio Home Assistant: o aparelho que ainda está sendo
+configurado no pareamento aparece assim, e o que parou de responder aparece como
+calado.
 
 Alguns aparelhos Zigbee da Tuya pareiam e não mostram tecla nenhuma, porque o
 Home Assistant ainda não conhece o modelo. A correção para eles vem aqui dentro
@@ -119,12 +126,26 @@ e carrega sozinha, sem nada para instalar ou configurar. Coberto hoje: o
 interruptor de seis teclas Nova Digital SA-6 (`_TZE28C1000000_gxbdnfrh`), que
 ganha as seis teclas.
 
-## Nome das teclas
+## Nomes
 
-Na página do aparelho, toque no nome embaixo de uma tecla para renomear; o
-mesmo campo está nas configurações do aparelho. O nome vai para o registro de
-entidades do Home Assistant, então dashboards e assistentes de voz também o
-recebem. Deixar vazio traz o nome original de volta.
+Na página do aparelho, o lápis ao lado do título renomeia o aparelho, e o nome
+embaixo de uma tecla renomeia a tecla; o mesmo campo está nas configurações do
+aparelho. O nome vai para o registro do Home Assistant, então os dashboards também
+o recebem, e a Alexa fica sabendo na hora. Deixar vazio o nome da tecla traz o
+original de volta.
+
+## Botões Zigbee
+
+Abra um botão Zigbee e toque em **Novo atalho**: aperte o botão do jeito que vai
+usar (um toque, dois toques ou segurando), escolha as teclas que ele aciona e se
+alterna, liga ou desliga. Fica salvo como uma automação comum do Home Assistant, e
+**Editar** reabre no mesmo formulário curto.
+
+## Painel
+
+**Ao painel**, na página do aparelho, ou **Adicionar ao painel**, num controle
+montado no painel, põe o card dele no seu painel principal (`custom:tuya-selfhost-device-card`,
+`custom:tuya-selfhost-remote-card`). Card que já está lá não é adicionado de novo.
 
 ## Cenas
 
@@ -152,8 +173,11 @@ continua valendo com o painel fechado e pode ser pausada na lista.
 
 ## Alexa
 
-A ação **Configuração da Alexa** monta o bloco `alexa:` inteiro a partir das suas
-entidades, pronto para colar. O guia cobre a skill self-hosted sem Nabu Casa e a
+A aba **Alexa** da engrenagem mostra como a Alexa chega na sua casa: o endereço que
+a Lambda da skill precisa chamar, o vínculo da conta e se os avisos de mudança
+chegam ao app da Alexa. Teclas aprendidas, cenas e nomes novos vão para a Alexa
+assim que são salvos. Em **Configurar do zero** ela monta o bloco `alexa:` inteiro
+a partir das suas entidades. O guia cobre a skill self-hosted sem Nabu Casa e a
 pegadinha do relatório proativo, que é o que faz o app da Alexa acompanhar o estado
 de verdade: **[ALEXA.pt-BR.md](ALEXA.pt-BR.md)** · [en](ALEXA.md) · [es](ALEXA.es.md)
 
@@ -168,6 +192,7 @@ Erros 901, 905 e 914, aparelhos que somem da rede, fechaduras, hubs e blasters:
 | --- | --- |
 | `tuya_selfhost.network_report` | Lista IP e MAC de cada aparelho e diz quais dá para bloquear na internet |
 | `tuya_selfhost.alexa_config` | Gera o bloco `alexa:` completo a partir das suas entidades |
+| `tuya_selfhost.alexa_announce` | Entrega à Alexa todas as teclas aprendidas e as cenas do painel, sem esperar uma descoberta |
 | `tuya_selfhost.send_learned_ir_command` | Dispara um código aprendido por um emissor infravermelho |
 
 ## Contribuindo

@@ -65,6 +65,10 @@ El login por QR solo sirve para obtener la `local_key`; la clave se guarda y la
 sesión no. Campo a campo en **[CONFIGURATION.md](CONFIGURATION.md)**, y cómo
 encontrar los datos a mano en **[DEVICE_DETAILS.md](DEVICE_DETAILS.md)**.
 
+¿Ya entraste con la cuenta una vez? El engranaje del panel tiene la pestaña
+**Añadir dispositivo**, con los dispositivos de la cuenta que aún no están aquí,
+cada uno con su botón **Añadir**.
+
 **¿Volviste a emparejar el dispositivo en la app?** Usa **Reconfigurar** en la
 entrada en lugar de borrarla: entity ids, historial, área y códigos aprendidos
 viajan con ella.
@@ -76,6 +80,7 @@ viajan con ella.
 | Cómo conecta | Qué cubre |
 | --- | --- |
 | **Wi-Fi, directo** | El grueso del catálogo: interruptores, enchufes, luces, climatización, ventiladores, cerraduras, sensores, persianas, aspiradoras, termos |
+| **Zigbee en el pendrive del propio Home Assistant** | Emparejados y listados desde el panel, junto con el resto. Los botones Zigbee tienen atajos — mira abajo |
 | **Zigbee tras una pasarela Tuya** | Subdispositivos alcanzados por el hub, configurados con su `device_cid`. La pasarela mantiene su nube; los subdispositivos no la necesitan |
 | **IR y RF por blaster** | Cualquier aparato, copiando su mando original — ver abajo |
 | **Bluetooth, como reserva** | Aparatos Wi-Fi cuyo módulo también tiene Bluetooth. Cuando el Wi-Fi no responde, la orden va por el Bluetooth del propio aparato, encontrado solo; nada que configurar. Los aparatos solo Bluetooth aún no son compatibles: mira [tuya_ble](https://github.com/PlusPlus-ua/ha_tuya_ble/) |
@@ -112,7 +117,9 @@ El engranaje de arriba tiene la pestaña **Red**, con una subpestaña por radio.
 el router. **Bluetooth** muestra las radios Tuya que Home Assistant oye ahora,
 con su señal — el dispositivo Wi-Fi que también tiene Bluetooth aparece ahí,
 porque esa es su reserva cuando el Wi-Fi se cae. **Zigbee** empareja y lista lo
-que cuelga de la red Zigbee del propio Home Assistant.
+que cuelga de la red Zigbee del propio Home Assistant: el dispositivo que aún se
+está configurando al emparejar aparece así, y el que dejó de responder aparece
+como callado.
 
 Algunos dispositivos Zigbee de Tuya se emparejan y no muestran ninguna tecla,
 porque Home Assistant aún no conoce el modelo. La corrección para ellos viene
@@ -120,13 +127,26 @@ aquí dentro y se carga sola, sin nada que instalar ni configurar. Cubierto hoy:
 el interruptor de seis teclas Nova Digital SA-6 (`_TZE28C1000000_gxbdnfrh`), que
 gana las seis teclas.
 
-## Nombre de las teclas
+## Nombres
 
-En la página del dispositivo, toca el nombre debajo de una tecla para
-renombrarla; el mismo campo está en los ajustes del dispositivo. El nombre va
-al registro de entidades de Home Assistant, así que los paneles y los
-asistentes de voz también lo reciben. Dejarlo vacío recupera el nombre
-original.
+En la página del dispositivo, el lápiz junto al título renombra el dispositivo, y
+el nombre debajo de una tecla renombra la tecla; el mismo campo está en los ajustes
+del dispositivo. El nombre va al registro de Home Assistant, así que los paneles
+también lo reciben, y Alexa se entera al momento. Dejar vacío el nombre de la tecla
+recupera el original.
+
+## Botones Zigbee
+
+Abre un botón Zigbee y toca **Nuevo atajo**: pulsa el botón como lo vas a usar
+(un toque, dos toques o manteniendo), elige las teclas que acciona y si alterna,
+enciende o apaga. Se guarda como una automatización normal de Home Assistant, y
+**Editar** la reabre en el mismo formulario corto.
+
+## Panel
+
+**Al panel**, en la página del dispositivo, o **Añadir al panel**, en un mando
+montado en el panel, pone su tarjeta en tu panel principal (`custom:tuya-selfhost-device-card`,
+`custom:tuya-selfhost-remote-card`). Una tarjeta que ya está no se añade otra vez.
 
 ## Escenas
 
@@ -155,8 +175,11 @@ el panel cerrado y se puede pausar desde la lista.
 
 ## Alexa
 
-La acción **Configuración de Alexa** genera el bloque `alexa:` completo a partir de
-tus entidades, listo para pegar. La guía cubre la skill self-hosted sin Nabu Casa y
+La pestaña **Alexa** del engranaje muestra cómo llega Alexa a tu casa: la dirección
+que debe llamar la Lambda de la skill, la vinculación de la cuenta y si los avisos
+de cambios llegan a la app de Alexa. Las teclas aprendidas, las escenas y los
+nombres nuevos llegan a Alexa en cuanto se guardan. En **Configurar desde cero**
+genera el bloque `alexa:` completo a partir de tus entidades. La guía cubre la skill self-hosted sin Nabu Casa y
 la trampa del informe proactivo, que es lo que hace que la app de Alexa siga el
 estado de verdad: **[ALEXA.es.md](ALEXA.es.md)** · [en](ALEXA.md) ·
 [pt-BR](ALEXA.pt-BR.md)
@@ -172,6 +195,7 @@ pasarelas y blasters: **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
 | --- | --- |
 | `tuya_selfhost.network_report` | Lista IP y MAC de cada dispositivo y cuáles se pueden bloquear de internet |
 | `tuya_selfhost.alexa_config` | Genera el bloque `alexa:` completo a partir de tus entidades |
+| `tuya_selfhost.alexa_announce` | Entrega a Alexa todas las teclas aprendidas y las escenas del panel, sin esperar un descubrimiento |
 | `tuya_selfhost.send_learned_ir_command` | Envía un código aprendido por un emisor infrarrojo |
 
 ## Contribuir
