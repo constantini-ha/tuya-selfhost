@@ -114,6 +114,10 @@ const STRINGS = {
     ac_turn_off: "Turn off",
     ac_keys_show: "Learned keys ({n})",
     ac_keys_hide: "Hide learned keys",
+    ac_settings: "This air conditioner",
+    ac_settings_help: "Units differ: say which modes yours has and in which the temperature counts. In the others, − and + are switched off.",
+    ac_has_mode: "Has it",
+    ac_uses_temp: "Temperature counts",
     zigbee_add: "Add a device",
     zigbee_add_help:
       "Open the network, then put the device into pairing — usually holding one key until its light blinks fast.",
@@ -521,6 +525,10 @@ const STRINGS = {
     ac_turn_off: "Desligar",
     ac_keys_show: "Teclas aprendidas ({n})",
     ac_keys_hide: "Esconder teclas aprendidas",
+    ac_settings: "Este ar-condicionado",
+    ac_settings_help: "Cada aparelho é de um jeito: diga quais modos o seu tem e em quais a temperatura vale. Nos outros, o − e o + ficam desligados.",
+    ac_has_mode: "Tem",
+    ac_uses_temp: "Temperatura vale",
     zigbee_add: "Adicionar aparelho",
     zigbee_add_help:
       "Abra a rede e ponha o aparelho em pareamento — normalmente segurando uma tecla até a luz piscar rápido.",
@@ -928,6 +936,10 @@ const STRINGS = {
     ac_turn_off: "Apagar",
     ac_keys_show: "Teclas aprendidas ({n})",
     ac_keys_hide: "Ocultar teclas aprendidas",
+    ac_settings: "Este aire acondicionado",
+    ac_settings_help: "Cada aparato es distinto: indica qué modos tiene el tuyo y en cuáles cuenta la temperatura. En los demás, − y + quedan desactivados.",
+    ac_has_mode: "Lo tiene",
+    ac_uses_temp: "Temperatura cuenta",
     zigbee_add: "Añadir dispositivo",
     zigbee_add_help:
       "Abre la red y pon el dispositivo en emparejamiento — normalmente manteniendo una tecla hasta que la luz parpadee rápido.",

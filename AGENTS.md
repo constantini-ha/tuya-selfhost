@@ -305,6 +305,15 @@ contradicts your instinct, trust the note.
   or the screenshot comes out unstyled. The card draws the remote page itself when
   the control has an air conditioner, with the taught keys folded; otherwise it is
   the old flat key grid.
+- **Per-unit air conditioner settings (2026.11.92).** The TCL112 code carries the
+  temperature in every mode (IRremoteESP8266 never drops it; its only per-mode rule is
+  Fan mode forcing fan High), but units ignore it in some modes — the owner's Agratto
+  in Dry. So it is data, not code: `control.ac = {modes, temp_modes}` in the layout
+  store, set in the panel's Edit view ("This air conditioner": has it / temperature
+  counts). Default all five modes, temperature in cool/heat/auto. The entity takes
+  `hvac_modes` from it and exposes `temp_modes`; on a layout save `_sync` hands the new
+  settings to the live entity (`apply_settings`) instead of recreating it. `renderAc`
+  shows `--` and switches off − and + where the temperature does not count.
 - HA 2026.11 warns that `_attr_target_temperature` is deprecated for
   `_attr_native_target_temperature` (works until 2027.11). The test env is 2026.7,
   which has no `native_*` on `ClimateEntity`, so the switch waits for the test env.

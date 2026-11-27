@@ -94,6 +94,25 @@ def _entity():
     return entity
 
 
+def ir_ac_modes():
+    return [
+        HVACMode.COOL,
+        HVACMode.HEAT,
+        HVACMode.DRY,
+        HVACMode.FAN_ONLY,
+        HVACMode.AUTO,
+    ]
+
+
+async def test_settings_from_the_panel_shape_the_modes():
+    entity = _entity()
+    entity.apply_settings({"modes": ["cool", "dry"], "temp_modes": ["cool", "heat"]})
+    assert entity.hvac_modes == [HVACMode.OFF, HVACMode.COOL, HVACMode.DRY]
+    # A mode the unit does not have cannot count for temperature.
+    assert entity.extra_state_attributes["temp_modes"] == ["cool"]
+    entity.async_write_ha_state.assert_called_once()
+
+
 def _sent(entity):
     data = entity.hass.services.async_call.call_args.args[2]
     assert data["entity_id"] == "remote.blaster"
@@ -108,7 +127,9 @@ async def test_climate_starts_off_with_the_learned_settings():
     assert entity.extra_state_attributes == {
         "tuya_control": "ac_1",
         "last_mode": "cool",
+        "temp_modes": ["cool", "heat", "auto"],
     }
+    assert entity.hvac_modes == [HVACMode.OFF, *ir_ac_modes()]
 
 
 async def test_climate_sends_the_whole_state():

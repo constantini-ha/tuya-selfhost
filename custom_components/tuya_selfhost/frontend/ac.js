@@ -1,6 +1,10 @@
 // The look of a learned remote, and the air conditioner drawn on it, shared by the panel and the card.
 import { t } from "./i18n.js";
 
+export const AC_MODES = ["cool", "heat", "dry", "fan_only", "auto"];
+// Most units ignore the temperature while drying or only blowing; each unit can say otherwise.
+export const AC_TEMP_MODES = ["cool", "heat", "auto"];
+
 export const AC_MODE_ICONS = {
   cool: "mdi:snowflake",
   heat: "mdi:fire",
@@ -41,7 +45,7 @@ export const REMOTE_CSS = `
 .ac-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:12px }
 .ac-row.wide { grid-template-columns:1fr 1fr; margin-bottom:6px }
 .key.pillkey { aspect-ratio:auto; border-radius:16px; padding:12px 8px; font-size:11px }
-.key.pillkey:disabled { opacity:.4; cursor:default }
+.key:disabled { opacity:.4; cursor:default; transform:none }
 .key.power.on { background:linear-gradient(180deg,#2E9E7A,#1F7559) }
 .ac-more { display:block; margin:12px auto 0; border:none; background:transparent; cursor:pointer;
   color:#8E97AC; font:inherit; font-size:12px; padding:6px 10px }
@@ -66,6 +70,7 @@ export function renderAc(hass, state) {
   const on = state.state !== "off";
   const mode = on ? state.state : a.last_mode || "cool";
   const temp = a.temperature ?? a.min_temp;
+  const counts = (a.temp_modes || AC_TEMP_MODES).includes(mode);
   const box = document.createElement("div");
   box.className = "ac";
   box.innerHTML = `<div class="screen ac-screen${on ? "" : " off"}">
@@ -74,7 +79,8 @@ export function renderAc(hass, state) {
     </div>
     <div class="ac-row"></div>
     <div class="ac-row wide"></div>`;
-  box.querySelector(".ac-temp span").textContent = temp;
+  box.querySelector(".ac-temp span").textContent = counts ? temp : "--";
+  if (!counts) box.querySelector(".ac-temp small").remove();
   box.querySelector(".ac-line").textContent = on
     ? `${_t("ac_mode_" + mode)} · ${_t("ac_fan_" + a.fan_mode)}`
     : _t("ac_off");
@@ -95,11 +101,14 @@ export function renderAc(hass, state) {
     if (next !== temp) call("set_temperature", { temperature: next });
   };
   const [row, wide] = box.querySelectorAll(".ac-row");
+  const colder = key("mdi:minus", _t("ac_colder"), () => step(-1));
+  const warmer = key("mdi:plus", _t("ac_warmer"), () => step(1));
+  colder.disabled = warmer.disabled = !counts;
   row.append(
-    key("mdi:minus", _t("ac_colder"), () => step(-1)),
+    colder,
     key("mdi:power", _t(on ? "ac_turn_off" : "ac_turn_on"), () => call(on ? "turn_off" : "turn_on"),
       on ? "power on" : "power"),
-    key("mdi:plus", _t("ac_warmer"), () => step(1))
+    warmer
   );
   const modes = (a.hvac_modes || []).filter((m) => m !== "off");
   const fans = a.fan_modes || [];

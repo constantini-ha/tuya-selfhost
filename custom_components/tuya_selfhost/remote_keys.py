@@ -54,6 +54,7 @@ async def async_setup_remote_keys(
     config = {**entry.data, **entry.options}
     device = hass.data[DOMAIN][get_device_id(config)]["device"]
     known: set[str] = set()
+    live: dict[str, ButtonEntity | SwitchEntity | ClimateEntity] = {}
 
     async def _sync(*_args) -> None:
         registry = er.async_get(hass)
@@ -104,9 +105,13 @@ async def async_setup_remote_keys(
                     wanted[button.unique_id] = button
 
         fresh = [b for uid, b in wanted.items() if uid not in known]
+        for uid, entity in wanted.items():
+            if uid in known and isinstance(live.get(uid), RemoteAirConditioner):
+                live[uid].apply_settings(entity.settings)
         if fresh:
             async_add_entities(fresh)
             known.update(b.unique_id for b in fresh)
+            live.update((b.unique_id, b) for b in fresh)
             await async_announce_to_alexa(hass, [b.entity_id for b in fresh])
 
         gone = []
@@ -116,6 +121,7 @@ async def async_setup_remote_keys(
                 registry.async_remove(entity_id)
                 gone.append(entity_id)
             known.discard(uid)
+            live.pop(uid, None)
         if gone:
             await async_forget_in_alexa(hass, gone)
 
@@ -171,6 +177,9 @@ async def _ac_template(hass: HomeAssistant, remote_id: str, control) -> tuple | 
     return template_of(codes, [c for c in (power.get("on"),) if c])
 
 
+# Most units ignore the temperature while drying or only blowing; the user can say otherwise.
+DEFAULT_TEMP_MODES = ["cool", "heat", "auto"]
+
 HVAC_MODES = {
     HVACMode.COOL: "cool",
     HVACMode.HEAT: "heat",
@@ -212,11 +221,30 @@ class RemoteAirConditioner(ClimateEntity, RestoreEntity):
         self._attr_unique_id = f"{entry.entry_id}:{control['id']}:climate"
         self._attr_device_info = _control_device(entry, device, control)
         self._attr_extra_state_attributes = {"tuya_control": control["id"]}
+        self.settings = control.get("ac") or {}
+        self._apply(self.settings)
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_target_temperature = learned.temperature
         self._attr_fan_mode = learned.fan
         self._attr_icon = "mdi:air-conditioner"
         self.entity_id = "climate." + slugify(f"{OBJECT_ID_PREFIX} {control['name']}")
+
+    def _apply(self, settings: dict) -> None:
+        modes = settings.get("modes") or list(HVAC_MODES.values())
+        self._attr_hvac_modes = [
+            HVACMode.OFF,
+            *(m for m, v in HVAC_MODES.items() if v in modes),
+        ]
+        self._temp_modes = [
+            m for m in settings.get("temp_modes", DEFAULT_TEMP_MODES) if m in modes
+        ]
+
+    def apply_settings(self, settings: dict) -> None:
+        """The modes this unit has and where temperature counts, as set in the panel."""
+        self.settings = settings
+        self._apply(settings)
+        if self.hass is not None:
+            self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -236,7 +264,11 @@ class RemoteAirConditioner(ClimateEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {**self._attr_extra_state_attributes, "last_mode": self._mode}
+        return {
+            **self._attr_extra_state_attributes,
+            "last_mode": self._mode,
+            "temp_modes": self._temp_modes,
+        }
 
     async def _send(self, power: bool) -> None:
         code = encode(

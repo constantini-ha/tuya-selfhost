@@ -1,5 +1,5 @@
 import { LANGUAGES, t } from "./i18n.js";
-import { REMOTE_CSS, acOf, acSignature, renderAc } from "./ac.js";
+import { AC_MODES, AC_TEMP_MODES, REMOTE_CSS, acOf, acSignature, renderAc } from "./ac.js";
 import { OUTLET_CSS, OUTLET_KINDS, deviceKind, keyOwnName, kindGlyph, loadOutletKinds, outletGlyph, outletKind,
   outletNames, saveOutletKinds } from "./outlets.js";
 
@@ -94,6 +94,10 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
   background:var(--card-background-color); color:var(--primary-text-color) }
 
 ${REMOTE_CSS}
+.acset { display:grid; grid-template-columns:1fr 92px 92px; align-items:center; gap:8px; padding:8px 0 }
+.acset + .acset { border-top:1px solid var(--divider-color) }
+.acset.head { color:var(--secondary-text-color); font-size:.8em }
+.acset .c { display:flex; justify-content:center; text-align:center }
 .tools { display:flex; justify-content:center; gap:1px; margin-top:3px }
 .tools button { border:none; background:transparent; color:#7D879C; cursor:pointer;
   font:inherit; font-size:11px; padding:1px 3px }
@@ -295,6 +299,59 @@ class TuyaSelfhostPanel extends HTMLElement {
       return "";
     }
     return acSignature(this._acOf(control));
+  }
+
+  // Which modes this unit has and where the temperature counts: units differ, so the owner says.
+  _renderAcSettings(control) {
+    const settings = control.ac || {};
+    const modes = settings.modes || [...AC_MODES];
+    const temps = settings.temp_modes || [...AC_TEMP_MODES];
+    const box = document.createElement("div");
+    box.className = "pad";
+    box.innerHTML = `<h3 style="margin:0 0 4px"></h3><div class="muted"></div>
+      <div class="acset head"><span></span><span class="c"></span><span class="c"></span></div>`;
+    box.querySelector("h3").textContent = this._t("ac_settings");
+    box.querySelector(".muted").textContent = this._t("ac_settings_help");
+    const [, has, temp] = box.querySelectorAll(".acset span");
+    has.textContent = this._t("ac_has_mode");
+    temp.textContent = this._t("ac_uses_temp");
+    const save = async (next) => {
+      control.ac = { ...settings, ...next };
+      await this._save(this._remoteOf(this._entry()));
+      this._render();
+    };
+    const toggle = (on, disabled, fn) => {
+      const b = document.createElement("button");
+      b.className = "toggle";
+      b.setAttribute("role", "switch");
+      b.setAttribute("aria-checked", String(on));
+      b.innerHTML = '<span class="knob"></span>';
+      b.disabled = disabled;
+      b.addEventListener("click", fn);
+      return b;
+    };
+    for (const mode of AC_MODES) {
+      const row = document.createElement("div");
+      row.className = "acset";
+      const name = document.createElement("span");
+      name.textContent = this._t("ac_mode_" + mode);
+      const present = modes.includes(mode);
+      const cell = (el) => {
+        const c = document.createElement("span");
+        c.className = "c";
+        c.appendChild(el);
+        return c;
+      };
+      row.append(
+        name,
+        cell(toggle(present, present && modes.length === 1, () =>
+          save({ modes: present ? modes.filter((m) => m !== mode) : [...modes, mode] }))),
+        cell(toggle(present && temps.includes(mode), !present, () =>
+          save({ temp_modes: temps.includes(mode) ? temps.filter((m) => m !== mode) : [...temps, mode] })))
+      );
+      box.appendChild(row);
+    }
+    return box;
   }
 
   _renderAc(state) {
@@ -3226,6 +3283,8 @@ class TuyaSelfhostPanel extends HTMLElement {
     }
     if (!ac || this._editing || this._acKeys) body.appendChild(keys);
     card.appendChild(body);
+
+    if (ac && this._editing) card.appendChild(this._renderAcSettings(control));
 
     if (this._busy) {
       const b = document.createElement("div");
