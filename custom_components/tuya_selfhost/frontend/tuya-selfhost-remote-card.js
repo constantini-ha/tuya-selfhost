@@ -1,3 +1,4 @@
+import { REMOTE_CSS, acOf, acSignature, renderAc } from "./ac.js";
 import { t, tn } from "./i18n.js";
 
 const LAYOUT_GET = "tuya_selfhost/layout/get";
@@ -34,6 +35,15 @@ const STYLE = `
   .empty { padding: 0 16px 16px; color: var(--secondary-text-color); }
 `;
 
+// The air conditioner card is the remote page itself, filling the card.
+const AC_CARD_STYLE = `
+  ${REMOTE_CSS}
+  ha-card { background: none; box-shadow: none; border: none; overflow: hidden; }
+  .remote { width: auto; margin: 0; border-radius: var(--ha-card-border-radius, 24px); }
+  .keys { margin-top: 12px; }
+  .key.sent { filter: brightness(1.5); }
+`;
+
 class TuyaSelfhostRemoteCard extends HTMLElement {
   setConfig(config) {
     if (!config || !config.entity) {
@@ -52,6 +62,10 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
     if (!this._loaded) {
       this._loaded = true;
       this._load();
+      return;
+    }
+    if (!first && this._control && this._acShown !== undefined) {
+      if (acSignature(acOf(hass, this._control.id)) !== this._acShown) this._render();
       return;
     }
     // The power switch carries a state, so the card has to follow it.
@@ -109,6 +123,12 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
 
   _render() {
     const control = this._control;
+    const ac = control && !this._error ? acOf(this._hass, control.id) : null;
+    if (ac) {
+      this._renderAc(control, ac);
+      return;
+    }
+    this._acShown = undefined;
     const card = document.createElement("ha-card");
     const power = (control && control.power) || {};
     const paired = new Set([power.on, power.off].filter(Boolean));
@@ -157,6 +177,57 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
 
     const style = document.createElement("style");
     style.textContent = STYLE;
+    this.innerHTML = "";
+    this.appendChild(style);
+    this.appendChild(card);
+  }
+
+  _renderAc(control, ac) {
+    this._acShown = acSignature(ac);
+    const card = document.createElement("ha-card");
+    const body = document.createElement("div");
+    body.className = "remote";
+    const brand = document.createElement("div");
+    brand.className = "brand";
+    brand.innerHTML = `<span></span><ha-icon icon="mdi:signal-variant" style="--mdc-icon-size:14px"></ha-icon>`;
+    brand.querySelector("span").textContent = this._config.title || control.name;
+    body.append(brand, renderAc(this._hass, ac));
+
+    const taught = control.buttons.filter((b) => b.taught);
+    if (taught.length) {
+      const more = document.createElement("button");
+      more.className = "ac-more";
+      more.textContent = this._t(this._keysOpen ? "ac_keys_hide" : "ac_keys_show", {
+        n: taught.length,
+      });
+      more.addEventListener("click", () => {
+        this._keysOpen = !this._keysOpen;
+        this._render();
+      });
+      body.appendChild(more);
+    }
+    if (taught.length && this._keysOpen) {
+      const keys = document.createElement("div");
+      keys.className = "keys";
+      keys.style.gridTemplateColumns = `repeat(${control.columns || 3}, 1fr)`;
+      for (const button of taught) {
+        const slot = document.createElement("div");
+        slot.className = "keyslot";
+        const key = document.createElement("button");
+        key.className = "key";
+        key.innerHTML = `<ha-icon></ha-icon><span></span>`;
+        key.querySelector("ha-icon").setAttribute("icon", button.icon || "mdi:remote");
+        key.querySelector("span").textContent = button.name;
+        key.addEventListener("click", () => this._send(control, button, key));
+        slot.appendChild(key);
+        keys.appendChild(slot);
+      }
+      body.appendChild(keys);
+    }
+    card.appendChild(body);
+
+    const style = document.createElement("style");
+    style.textContent = AC_CARD_STYLE;
     this.innerHTML = "";
     this.appendChild(style);
     this.appendChild(card);
@@ -214,6 +285,7 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
 
   getCardSize() {
     const control = this._control;
+    if (this._acShown !== undefined) return 7;
     const power = (control && control.power) || {};
     const paired = new Set([power.on, power.off].filter(Boolean));
     const loose = control

@@ -298,6 +298,16 @@ contradicts your instinct, trust the note.
   fan, −/power/+) when such an entity exists; the taught keys fold under
   "Learned keys (n)" except while editing. It re-renders when the climate state
   changes (`_acSignature`).
+- The remote's look (`REMOTE_CSS`) and the air conditioner screen (`renderAc`, `acOf`,
+  `acSignature`) live in `frontend/ac.js`, shared by the panel and
+  `tuya-selfhost-remote-card.js` (2026.11.91). The panel's `STYLE` interpolates
+  `${REMOTE_CSS}`, so a harness that slices `STYLE` out of the source must resolve it,
+  or the screenshot comes out unstyled. The card draws the remote page itself when
+  the control has an air conditioner, with the taught keys folded; otherwise it is
+  the old flat key grid.
+- HA 2026.11 warns that `_attr_target_temperature` is deprecated for
+  `_attr_native_target_temperature` (works until 2027.11). The test env is 2026.7,
+  which has no `native_*` on `ClimateEntity`, so the switch waits for the test env.
 
 ### Home Assistant traps that cost real debugging time
 
