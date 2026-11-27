@@ -1050,10 +1050,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     entities = set()
     for e in device_conf.all_entities():
         entities.add(e.entity)
-    # An emitter needs the button platform even without Tuya buttons of its own:
-    # that is where the learned keys show up.
+    # An emitter needs these platforms even without Tuya entities of its own:
+    # that is where the learned keys, power pairs and air conditioners show up.
     if "remote" in entities:
-        entities.update(("button", "switch"))
+        entities.update(("button", "switch", "climate"))
 
     await hass.config_entries.async_forward_entry_setups(entry, entities)
     await async_setup_services(hass, entities)

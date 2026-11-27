@@ -7,20 +7,30 @@ it.
 """
 
 import logging
+from typing import Any
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.components.climate import (
+    ClimateEntity,
+    ClimateEntityFeature,
+    HVACMode,
+)
+from homeassistant.components.remote import DATA_COMPONENT as REMOTES
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import slugify
 
 from .const import DOMAIN
 from .helpers.config import get_device_id
+from .ir_ac import MAX_TEMP, MIN_TEMP, AcState, encode, template_of
 from .remote_card import SIGNAL_LAYOUTS, STORAGE_KEY
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,8 +47,9 @@ async def async_setup_remote_keys(
 ) -> None:
     """Keep the entities of one domain in step with what the panel saves.
 
-    `kind` is "button" for the single keys and "switch" for a power pair; each
-    platform owns its own adder, so they cannot share one pass.
+    `kind` is "button" for the single keys, "switch" for a power pair and
+    "climate" for an air conditioner whose codes we can write; each platform
+    owns its own adder, so they cannot share one pass.
     """
     config = {**entry.data, **entry.options}
     device = hass.data[DOMAIN][get_device_id(config)]["device"]
@@ -57,9 +68,17 @@ async def async_setup_remote_keys(
         store = hass.data.get(STORAGE_KEY)
         stored = await store.async_load() or {}
 
-        wanted: dict[str, ButtonEntity | SwitchEntity] = {}
+        wanted: dict[str, ButtonEntity | SwitchEntity | ClimateEntity] = {}
         for remote_id in remotes:
             for control in (stored.get(remote_id) or {}).get("controls", []):
+                if kind == "climate":
+                    found = await _ac_template(hass, remote_id, control)
+                    if found:
+                        climate = RemoteAirConditioner(
+                            entry, device, remote_id, control, *found
+                        )
+                        wanted[climate.unique_id] = climate
+                    continue
                 power = control.get("power") or {}
                 by_command = {k["command"]: k for k in control.get("buttons", [])}
                 paired = {
@@ -69,7 +88,9 @@ async def async_setup_remote_keys(
                 }
                 if kind == "switch":
                     if paired:
-                        switch = RemotePowerSwitch(entry, device, remote_id, control, power)
+                        switch = RemotePowerSwitch(
+                            entry, device, remote_id, control, power
+                        )
                         wanted[switch.unique_id] = switch
                     continue
                 for key in control.get("buttons", []):
@@ -138,6 +159,138 @@ class RemoteKeyButton(ButtonEntity):
             },
             blocking=True,
         )
+
+
+async def _ac_template(hass: HomeAssistant, remote_id: str, control) -> tuple | None:
+    """A learned code of this control we can rewrite, with the state it carries."""
+    remote = hass.data[REMOTES].get_entity(remote_id) if REMOTES in hass.data else None
+    if remote is None or not hasattr(remote, "async_codes"):
+        return None
+    codes = await remote.async_codes(control.get("device"))
+    power = control.get("power") or {}
+    return template_of(codes, [c for c in (power.get("on"),) if c])
+
+
+HVAC_MODES = {
+    HVACMode.COOL: "cool",
+    HVACMode.HEAT: "heat",
+    HVACMode.DRY: "dry",
+    HVACMode.FAN_ONLY: "fan_only",
+    HVACMode.AUTO: "auto",
+}
+
+
+class RemoteAirConditioner(ClimateEntity, RestoreEntity):
+    """An air conditioner driven by codes written from a learned one.
+
+    Infrared is one way: what is shown is what was last sent.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_should_poll = False
+    _attr_assumed_state = True
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_target_temperature_step = 1
+    _attr_min_temp = MIN_TEMP
+    _attr_max_temp = MAX_TEMP
+    _attr_hvac_modes = [HVACMode.OFF, *HVAC_MODES]
+    _attr_fan_modes = ["auto", "low", "medium", "high"]
+    _attr_supported_features = (
+        ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.FAN_MODE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
+    )
+
+    def __init__(
+        self, entry, device, remote_id, control, template: str, learned: AcState
+    ):
+        self._remote_id = remote_id
+        self._template = template
+        self._mode = learned.mode
+        self._attr_unique_id = f"{entry.entry_id}:{control['id']}:climate"
+        self._attr_device_info = _control_device(entry, device, control)
+        self._attr_extra_state_attributes = {"tuya_control": control["id"]}
+        self._attr_hvac_mode = HVACMode.OFF
+        self._attr_target_temperature = learned.temperature
+        self._attr_fan_mode = learned.fan
+        self._attr_icon = "mdi:air-conditioner"
+        self.entity_id = "climate." + slugify(f"{OBJECT_ID_PREFIX} {control['name']}")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is None:
+            return
+        if last.state in HVAC_MODES:
+            self._attr_hvac_mode = HVACMode(last.state)
+            self._mode = HVAC_MODES[self._attr_hvac_mode]
+        elif last.state == HVACMode.OFF:
+            self._mode = last.attributes.get("last_mode") or self._mode
+        temperature = last.attributes.get(ATTR_TEMPERATURE)
+        if isinstance(temperature, (int, float)):
+            self._attr_target_temperature = int(temperature)
+        if last.attributes.get("fan_mode") in self._attr_fan_modes:
+            self._attr_fan_mode = last.attributes["fan_mode"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {**self._attr_extra_state_attributes, "last_mode": self._mode}
+
+    async def _send(self, power: bool) -> None:
+        code = encode(
+            self._template,
+            AcState(
+                power,
+                self._mode,
+                int(self._attr_target_temperature),
+                self._attr_fan_mode,
+            ),
+        )
+        await self.hass.services.async_call(
+            "remote",
+            "send_command",
+            {"entity_id": self._remote_id, "command": f"b64:{code}"},
+            blocking=True,
+        )
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        if hvac_mode == HVACMode.OFF:
+            await self._send(False)
+        else:
+            self._mode = HVAC_MODES[hvac_mode]
+            await self._send(True)
+        self._attr_hvac_mode = hvac_mode
+        self.async_write_ha_state()
+
+    async def async_turn_on(self) -> None:
+        await self.async_set_hvac_mode(
+            next(m for m, v in HVAC_MODES.items() if v == self._mode)
+        )
+
+    async def async_turn_off(self) -> None:
+        await self.async_set_hvac_mode(HVACMode.OFF)
+
+    async def async_set_temperature(self, **kwargs: Any) -> None:
+        if ATTR_TEMPERATURE in kwargs:
+            self._attr_target_temperature = int(
+                min(MAX_TEMP, max(MIN_TEMP, kwargs[ATTR_TEMPERATURE]))
+            )
+        mode = kwargs.get("hvac_mode")
+        if mode is not None:
+            await self.async_set_hvac_mode(mode)
+            return
+        # The unit takes the whole state at once: sending while off would switch it on.
+        if self._attr_hvac_mode != HVACMode.OFF:
+            await self._send(True)
+        self.async_write_ha_state()
+
+    async def async_set_fan_mode(self, fan_mode: str) -> None:
+        self._attr_fan_mode = fan_mode
+        if self._attr_hvac_mode != HVACMode.OFF:
+            await self._send(True)
+        self.async_write_ha_state()
 
 
 def _alexa_config(hass: HomeAssistant):
@@ -220,7 +373,9 @@ class RemotePowerSwitch(SwitchEntity):
         self.async_write_ha_state()
 
 
-async def _async_tell_alexa(hass: HomeAssistant, entity_ids: list[str], *, gone: bool) -> bool:
+async def _async_tell_alexa(
+    hass: HomeAssistant, entity_ids: list[str], *, gone: bool
+) -> bool:
     """Send one discovery message about these keys.
 
     Home Assistant sends these only for Nabu Casa accounts; a self-hosted skill
@@ -246,6 +401,10 @@ async def _async_tell_alexa(hass: HomeAssistant, entity_ids: list[str], *, gone:
         _LOGGER.debug("Alexa proactive reporting is off; keys not reported")
         return False
 
+    if not gone:
+        entity_ids = [e for e in entity_ids if config.should_expose(e)]
+        if not entity_ids:
+            return False
     send = async_send_delete_message if gone else async_send_add_or_update_message
     try:
         await send(hass, config, entity_ids)

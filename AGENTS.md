@@ -280,6 +280,24 @@ contradicts your instinct, trust the note.
   the 20 °C made from it matched, byte for byte, the "Ligar" code learned from the
   real remote. Change only the spaces of the bits that differ and keep the learned
   timings, so the code still looks like the remote's own.
+- **Air conditioner as a `climate` entity (2026.11.90).** `ir_ac.py` reads a learned
+  code (`recognize`) and writes any power/mode/temperature/fan into it (`encode`).
+  Mode values heat 1, dry 2, cool 3, fan 7, auto 8; fan (byte 8 bits 0-2) auto 0,
+  low 2, medium 3, high 5, from IRremoteESP8266 `ir_Tcl.h`. Only cool and 16-25 °C
+  were confirmed on the owner's unit; the 12 codes on file come out bit for bit.
+  `remote_keys.py` with kind `climate` adds a `RemoteAirConditioner` for every
+  control with a recognizable code (power-on key first, `TuyaLocalRemote.async_codes`),
+  `climate.tuya_remote_<control>`, attribute `tuya_control` = control id so the
+  panel finds it. Assumed state, restored on restart (`last_mode` remembers the mode
+  while off); changing temperature or fan while off only stores it, because every
+  code carries power too. `climate` is now forwarded for emitters like `button` and
+  `switch`, and the `climate.py` setup checks the device config first (the
+  "fails if no climate" tests now expect a quiet no-op, as button and switch do).
+  Alexa announcements now skip entities the filter does not expose.
+- The remote page swaps its screen for the air conditioner's (temperature, mode,
+  fan, −/power/+) when such an entity exists; the taught keys fold under
+  "Learned keys (n)" except while editing. It re-renders when the climate state
+  changes (`_acSignature`).
 
 ### Home Assistant traps that cost real debugging time
 

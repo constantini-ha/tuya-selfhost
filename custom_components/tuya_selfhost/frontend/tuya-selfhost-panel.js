@@ -16,6 +16,13 @@ const CLOUD_LOGOUT = "tuya_selfhost/cloud/logout";
 const CLOUD_DEVICES = "tuya_selfhost/cloud/devices";
 const CLOUD_ADD = "tuya_selfhost/cloud/add";
 const ZHA_DEVICES = "zha/devices";
+const AC_MODE_ICONS = {
+  cool: "mdi:snowflake",
+  heat: "mdi:fire",
+  dry: "mdi:water-percent",
+  fan_only: "mdi:fan",
+  auto: "mdi:thermostat-auto",
+};
 const RENAME = "tuya_selfhost/rename";
 const PRESSES = "tuya_selfhost/presses";
 const PRESS_WORDS = {
@@ -114,6 +121,19 @@ input, select { padding:9px; border-radius:9px; font:inherit; border:1px solid v
   color:#6B728C }
 .key.untaught { background:linear-gradient(180deg,#3B4256,#272C3A); opacity:.55 }
 .key span { max-width:92%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ac-screen { display:flex; flex-direction:column; align-items:center; gap:2px; padding:16px 14px }
+.ac-screen.off { color:#4D6B78 }
+.ac-temp { font-size:56px; line-height:1; font-weight:300; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums }
+.ac-temp small { font-size:16px; vertical-align:top; margin-left:2px }
+.ac-line { font-size:12px; letter-spacing:.04em }
+.ac-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:12px }
+.ac-row.wide { grid-template-columns:1fr 1fr; margin-bottom:6px }
+.key.pillkey { aspect-ratio:auto; border-radius:16px; padding:12px 8px; font-size:11px }
+.key.pillkey:disabled { opacity:.4; cursor:default }
+.key.power.on { background:linear-gradient(180deg,#2E9E7A,#1F7559) }
+.ac-more { display:block; margin:12px auto 0; border:none; background:transparent; cursor:pointer;
+  color:#8E97AC; font:inherit; font-size:12px; padding:6px 10px }
 .tools { display:flex; justify-content:center; gap:1px; margin-top:3px }
 .tools button { border:none; background:transparent; color:#7D879C; cursor:pointer;
   font:inherit; font-size:11px; padding:1px 3px }
@@ -294,10 +314,87 @@ class TuyaSelfhostPanel extends HTMLElement {
       const signature = this._signature();
       if (signature !== this._signature_shown) this._render();
     }
+    if (this._remote && !this._editing && !this._busy && this._acSignature() !== this._ac_shown)
+      this._render();
   }
 
   _scenesShown() {
     return this._scenesSignature() + "#" + this._autosSignature();
+  }
+
+  _acOf(control) {
+    if (!control || !this._hass) return null;
+    return (
+      Object.values(this._hass.states).find(
+        (s) => s.entity_id.startsWith("climate.") && s.attributes.tuya_control === control.id
+      ) || null
+    );
+  }
+
+  _acSignature() {
+    let control = null;
+    try {
+      control = this._control();
+    } catch (err) {
+      return "";
+    }
+    const ac = this._acOf(control);
+    return ac ? [ac.state, ac.attributes.temperature, ac.attributes.fan_mode].join("|") : "";
+  }
+
+  _renderAc(state) {
+    const a = state.attributes;
+    const on = state.state !== "off";
+    const mode = on ? state.state : a.last_mode || "cool";
+    const temp = a.temperature ?? a.min_temp;
+    const box = document.createElement("div");
+    box.className = "ac";
+    box.innerHTML = `<div class="screen ac-screen${on ? "" : " off"}">
+        <div class="ac-temp"><span></span><small>°C</small></div>
+        <div class="ac-line"></div>
+      </div>
+      <div class="ac-row"></div>
+      <div class="ac-row wide"></div>`;
+    box.querySelector(".ac-temp span").textContent = temp;
+    box.querySelector(".ac-line").textContent = on
+      ? `${this._t("ac_mode_" + mode)} · ${this._t("ac_fan_" + a.fan_mode)}`
+      : this._t("ac_off");
+
+    const call = (service, data = {}) =>
+      this._hass.callService("climate", service, { entity_id: state.entity_id, ...data });
+    const key = (icon, label, fn, extra = "") => {
+      const b = document.createElement("button");
+      b.className = "key " + extra;
+      b.setAttribute("aria-label", label);
+      b.innerHTML = `<ha-icon icon="${icon}"></ha-icon><span></span>`;
+      b.querySelector("span").textContent = label;
+      b.addEventListener("click", fn);
+      return b;
+    };
+    const step = (delta) => {
+      const next = Math.min(a.max_temp, Math.max(a.min_temp, temp + delta));
+      if (next !== temp) call("set_temperature", { temperature: next });
+    };
+    const [row, wide] = box.querySelectorAll(".ac-row");
+    row.append(
+      key("mdi:minus", this._t("ac_colder"), () => step(-1)),
+      key("mdi:power", this._t(on ? "ac_turn_off" : "ac_turn_on"), () =>
+        call(on ? "turn_off" : "turn_on"), on ? "power on" : "power"),
+      key("mdi:plus", this._t("ac_warmer"), () => step(1))
+    );
+    const modes = (a.hvac_modes || []).filter((m) => m !== "off");
+    const fans = a.fan_modes || [];
+    const modeKey = key(AC_MODE_ICONS[mode] || "mdi:air-conditioner",
+      this._t("ac_mode", { mode: this._t("ac_mode_" + mode) }),
+      () => call("set_hvac_mode", { hvac_mode: modes[(modes.indexOf(mode) + 1) % modes.length] }),
+      "pillkey");
+    modeKey.disabled = !on;
+    const fanKey = key("mdi:fan",
+      this._t("ac_fan", { fan: this._t("ac_fan_" + a.fan_mode) }),
+      () => call("set_fan_mode", { fan_mode: fans[(fans.indexOf(a.fan_mode) + 1) % fans.length] }),
+      "pillkey");
+    wide.append(modeKey, fanKey);
+    return box;
   }
 
   _signature() {
@@ -3160,8 +3257,11 @@ class TuyaSelfhostPanel extends HTMLElement {
     // the remote body
     const body = document.createElement("div");
     body.className = "remote";
+    const ac = this._acOf(control);
+    this._ac_shown = this._acSignature();
     body.innerHTML = `<div class="brand"><span>${control.name}</span><ha-icon icon="mdi:signal-variant" style="--mdc-icon-size:14px"></ha-icon></div>
-      <div class="screen">${this._screen || "pronto"}</div>`;
+      ${ac ? "" : `<div class="screen">${this._screen || "pronto"}</div>`}`;
+    if (ac) body.appendChild(this._renderAc(ac));
 
     const keys = document.createElement("div");
     keys.className = "keys";
@@ -3207,7 +3307,20 @@ class TuyaSelfhostPanel extends HTMLElement {
       slot.appendChild(tools);
       keys.appendChild(slot);
     });
-    body.appendChild(keys);
+    // An air conditioner is run from its own controls; the taught keys stay one tap away.
+    if (ac && !this._editing) {
+      const more = document.createElement("button");
+      more.className = "ac-more";
+      more.textContent = this._t(this._acKeys ? "ac_keys_hide" : "ac_keys_show", {
+        n: control.buttons.length,
+      });
+      more.addEventListener("click", () => {
+        this._acKeys = !this._acKeys;
+        this._render();
+      });
+      body.appendChild(more);
+    }
+    if (!ac || this._editing || this._acKeys) body.appendChild(keys);
     card.appendChild(body);
 
     if (this._busy) {

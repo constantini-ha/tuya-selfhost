@@ -104,7 +104,14 @@ air conditioner? Copy the real remote instead.
 ```
 
 Works with any brand, because it depends on no protocol at all — it is your own
-signal, recorded and replayed. Full recipe in
+signal, recorded and replayed.
+
+**Air conditioners.** When a learned key is a protocol the integration can read
+(TCL112 so far: TCL, Agratto and other TCL-made units), the remote turns into a
+real air conditioner: temperature −/+, mode, fan and power on the remote page, and a
+`climate` entity for dashboards, automations and voice. One learned key is enough;
+every other combination is written from it. Infrared does not answer back, so what
+you see is the last thing sent. Full recipe in
 **[LEARNED_REMOTES.md](LEARNED_REMOTES.md)** ·
 [pt-BR](LEARNED_REMOTES.pt-BR.md) · [es](LEARNED_REMOTES.es.md)
 

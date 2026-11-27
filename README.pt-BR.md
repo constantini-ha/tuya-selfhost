@@ -105,7 +105,14 @@ com o seu ar-condicionado? Copie o controle de verdade.
 ```
 
 Funciona com qualquer marca, porque não depende de protocolo nenhum — é o seu próprio
-sinal, gravado e repetido. Receita completa em
+sinal, gravado e repetido.
+
+**Ar-condicionado.** Quando uma tecla aprendida está num protocolo que a integração
+sabe ler (por enquanto TCL112: TCL, Agratto e outros fabricados pela TCL), o controle
+vira um ar-condicionado de verdade: temperatura −/+, modo, ventilação e liga/desliga
+na página do controle, e uma entidade `climate` para painéis, automações e voz. Uma
+tecla aprendida basta; todas as outras combinações são escritas a partir dela. O
+infravermelho não responde de volta, então o que aparece é o último comando enviado. Receita completa em
 **[LEARNED_REMOTES.pt-BR.md](LEARNED_REMOTES.pt-BR.md)** ·
 [en](LEARNED_REMOTES.md) · [es](LEARNED_REMOTES.es.md)
 

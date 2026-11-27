@@ -89,11 +89,8 @@ async def test_init_entry_fails_if_device_has_no_climate(hass):
     hass.data[DOMAIN] = {}
     hass.data[DOMAIN]["dummy"] = {}
     hass.data[DOMAIN]["dummy"]["device"] = m_device
-    try:
-        await async_setup_entry(hass, entry, m_add_entities)
-        assert False
-    except ValueError:
-        pass
+    # The platform also carries learned remote entities, so it no longer refuses.
+    await async_setup_entry(hass, entry, m_add_entities)
     m_add_entities.assert_not_called()
 
 
@@ -117,9 +114,6 @@ async def test_init_entry_fails_if_config_is_missing(hass):
     hass.data[DOMAIN] = {}
     hass.data[DOMAIN]["dummy"] = {}
     hass.data[DOMAIN]["dummy"]["device"] = m_device
-    try:
-        await async_setup_entry(hass, entry, m_add_entities)
-        assert False
-    except ValueError:
-        pass
+    # The platform also carries learned remote entities, so it no longer refuses.
+    await async_setup_entry(hass, entry, m_add_entities)
     m_add_entities.assert_not_called()

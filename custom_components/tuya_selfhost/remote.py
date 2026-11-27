@@ -142,6 +142,12 @@ class TuyaLocalRemote(TuyaLocalEntity, RemoteEntity):
         self._codes.setdefault(subdevice, {}).update(codes)
         await self._code_storage.async_save(self._codes)
 
+    async def async_codes(self, subdevice: str) -> dict:
+        """The codes kept for one control, learned or ready-made."""
+        if not self._storage_loaded:
+            await self._async_load_storage()
+        return dict(self._codes.get(subdevice) or {})
+
     async def _async_load_storage(self):
         """Load stored codes and flags from disk."""
         self._codes.update(await self._code_storage.async_load() or {})

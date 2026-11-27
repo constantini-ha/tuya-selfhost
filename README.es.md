@@ -106,7 +106,15 @@ funciona con tu aire acondicionado? Copia el mando de verdad.
 ```
 
 Funciona con cualquier marca, porque no depende de ningún protocolo — es tu propia
-señal, grabada y repetida. Receta completa en
+señal, grabada y repetida.
+
+**Aire acondicionado.** Cuando una tecla aprendida está en un protocolo que la
+integración sabe leer (por ahora TCL112: TCL, Agratto y otros fabricados por TCL),
+el mando se convierte en un aire acondicionado de verdad: temperatura −/+, modo,
+ventilación y encendido en la página del mando, y una entidad `climate` para paneles,
+automatizaciones y voz. Basta una tecla aprendida; todas las demás combinaciones se
+escriben a partir de ella. El infrarrojo no responde, así que lo que ves es lo último
+que se envió. Receta completa en
 **[LEARNED_REMOTES.es.md](LEARNED_REMOTES.es.md)** ·
 [en](LEARNED_REMOTES.md) · [pt-BR](LEARNED_REMOTES.pt-BR.md)
 
