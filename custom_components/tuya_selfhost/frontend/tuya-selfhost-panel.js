@@ -434,10 +434,56 @@ class TuyaSelfhostPanel extends HTMLElement {
         );
       }
       this._zigbee = found;
+      this._noZigbee = false;
+      this._zigbeeDown = null;
     } catch (err) {
       this._zigbee = [];
-      this._noZigbee = true;
+      this._zigbeeDown = await this._zhaTrouble();
+      this._noZigbee = !this._zigbeeDown;
     }
+  }
+
+  // A ZHA entry that failed to start (stick unplugged or hung) is not a house without Zigbee.
+  async _zhaTrouble() {
+    try {
+      const entries = await this._hass.callWS({ type: "config_entries/get", domain: "zha" });
+      const entry = (entries || []).find((e) => e.state !== "loaded" && e.state !== "not_loaded");
+      return entry ? { entry_id: entry.entry_id, reason: entry.reason || entry.state } : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async _restartZigbee(button) {
+    button.disabled = true;
+    try {
+      await this._hass.callApi(
+        "POST",
+        `config/config_entries/entry/${this._zigbeeDown.entry_id}/reload`
+      );
+    } catch (err) {
+      // The entry's new state below tells whether it came back.
+    }
+    await this._loadZigbee();
+    this._render();
+  }
+
+  _zigbeeDownBlock() {
+    const block = document.createElement("div");
+    block.className = "block";
+    block.innerHTML = `<h3></h3><div class="muted"></div>
+      <div class="muted" style="margin-top:6px;font-family:var(--code-font-family,monospace);font-size:12px;word-break:break-all"></div>`;
+    block.querySelector("h3").textContent = this._t("zigbee_down");
+    const [help, reason] = block.querySelectorAll(".muted");
+    help.textContent = this._t("zigbee_down_help");
+    reason.textContent = this._zigbeeDown.reason;
+    const again = document.createElement("button");
+    again.className = "act";
+    again.style.marginTop = "12px";
+    again.textContent = this._t("zigbee_down_retry");
+    again.addEventListener("click", () => this._restartZigbee(again));
+    block.appendChild(again);
+    return block;
   }
 
   async _loadAutomations() {
@@ -2403,6 +2449,10 @@ class TuyaSelfhostPanel extends HTMLElement {
       <div class="muted">${this._t("zigbee_intro")}</div>`;
     box.appendChild(head);
 
+    if (this._zigbeeDown) {
+      box.appendChild(this._zigbeeDownBlock());
+      return box;
+    }
     if (this._noZigbee) {
       box.insertAdjacentHTML(
         "beforeend",
@@ -2740,6 +2790,24 @@ class TuyaSelfhostPanel extends HTMLElement {
         "beforeend",
         '<ha-icon icon="mdi:chevron-right" style="--mdc-icon-size:22px;opacity:.5"></ha-icon>'
       );
+      card.appendChild(row);
+    }
+    if (this._zigbeeDown) {
+      const row = document.createElement("div");
+      row.className = "dev";
+      row.innerHTML = `<ha-icon icon="mdi:zigbee"></ha-icon>
+        <div class="grow"><div></div><div class="muted"></div></div>
+        <span class="pill bad"></span>
+        <ha-icon icon="mdi:chevron-right" style="--mdc-icon-size:22px;opacity:.5"></ha-icon>`;
+      row.querySelector(".grow div").textContent = this._t("zigbee_down");
+      row.querySelector(".grow .muted").textContent = this._t("zigbee_down_short");
+      row.querySelector(".pill").textContent = this._t("zigbee_gone");
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => {
+        this._config = "network";
+        this._net = "zigbee";
+        this._render();
+      });
       card.appendChild(row);
     }
     return card;

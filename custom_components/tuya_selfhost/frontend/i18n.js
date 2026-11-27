@@ -91,6 +91,11 @@ const STRINGS = {
     zigbee_intro:
       "Zigbee devices do not use Wi-Fi: they reach Home Assistant through the stick. They sit in your device list with the rest.",
     zigbee_absent: "No Zigbee network on this Home Assistant.",
+    zigbee_down: "The Zigbee stick stopped answering",
+    zigbee_down_short: "Zigbee devices are out until the stick answers again",
+    zigbee_down_help:
+      "The devices and the network are kept. Unplug the stick, wait 5 seconds, plug it back in and tap Try again.",
+    zigbee_down_retry: "Try again",
     zigbee_add: "Add a device",
     zigbee_add_help:
       "Open the network, then put the device into pairing — usually holding one key until its light blinks fast.",
@@ -475,6 +480,11 @@ const STRINGS = {
     zigbee_intro:
       "Aparelho Zigbee não usa Wi-Fi: ele chega ao Home Assistant pelo pendrive. Eles ficam na sua lista de aparelhos junto com o resto.",
     zigbee_absent: "Não há rede Zigbee neste Home Assistant.",
+    zigbee_down: "O pendrive Zigbee parou de responder",
+    zigbee_down_short: "Aparelhos Zigbee fora até o pendrive voltar",
+    zigbee_down_help:
+      "Os aparelhos e a rede continuam guardados. Tire o pendrive do USB, espere 5 segundos, ponha de volta e toque em Tentar de novo.",
+    zigbee_down_retry: "Tentar de novo",
     zigbee_add: "Adicionar aparelho",
     zigbee_add_help:
       "Abra a rede e ponha o aparelho em pareamento — normalmente segurando uma tecla até a luz piscar rápido.",
@@ -859,6 +869,11 @@ const STRINGS = {
     zigbee_intro:
       "Un dispositivo Zigbee no usa Wi-Fi: llega a Home Assistant por el lápiz USB. Están en tu lista de dispositivos con el resto.",
     zigbee_absent: "No hay red Zigbee en este Home Assistant.",
+    zigbee_down: "El pendrive Zigbee dejó de responder",
+    zigbee_down_short: "Dispositivos Zigbee fuera hasta que el pendrive vuelva",
+    zigbee_down_help:
+      "Los dispositivos y la red siguen guardados. Saca el pendrive del USB, espera 5 segundos, vuelve a ponerlo y toca Intentar de nuevo.",
+    zigbee_down_retry: "Intentar de nuevo",
     zigbee_add: "Añadir dispositivo",
     zigbee_add_help:
       "Abre la red y pon el dispositivo en emparejamiento — normalmente manteniendo una tecla hasta que la luz parpadee rápido.",
