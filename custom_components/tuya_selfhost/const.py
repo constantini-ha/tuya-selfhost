@@ -1,4 +1,6 @@
 DOMAIN = "tuya_selfhost"
+# Every code an emitter sends, so the entities of that control can follow it.
+SIGNAL_CODE_SENT = f"{DOMAIN}_code_sent"
 DATA_STORE = "store"
 DATA_DISCOVERY = "discovery"
 

@@ -8,7 +8,10 @@ import pytest
 from homeassistant.components.climate import HVACMode
 
 from custom_components.tuya_selfhost import ir_ac
-from custom_components.tuya_selfhost.remote_keys import RemoteAirConditioner
+from custom_components.tuya_selfhost.remote_keys import (
+    RemoteAirConditioner,
+    RemotePowerSwitch,
+)
 
 FIRST = [0x23, 0xCB, 0x26, 0x02, 0x00, 0x40, 0, 0, 0, 0, 0, 0, 0, 0x65]
 COOL_20 = [0x23, 0xCB, 0x26, 0x01, 0x00, 0x24, 0x03, 0x0B, 0, 0, 0, 0, 0x80, 0xC7]
@@ -75,6 +78,13 @@ def test_template_prefers_a_powered_on_code():
     assert ir_ac.template_of({"junk": "AAAA"}, []) is None
 
 
+KEYS = "custom_components.tuya_selfhost.remote_keys"
+
+
+def _ac(power, mode="cool", degrees=20, fan="auto"):
+    return ir_ac.encode(_code(COOL_20), ir_ac.AcState(power, mode, degrees, fan))
+
+
 def _entity():
     control = {"id": "ac_1", "name": "Ar condicionado", "device": "ac"}
     with patch(
@@ -116,6 +126,7 @@ async def test_settings_from_the_panel_shape_the_modes():
 def _sent(entity):
     data = entity.hass.services.async_call.call_args.args[2]
     assert data["entity_id"] == "remote.blaster"
+    assert data["device"] == "ac"
     return ir_ac.recognize(data["command"].removeprefix("b64:"))
 
 
@@ -167,8 +178,11 @@ async def test_restores_the_last_state():
         state="off",
         attributes={"temperature": 23, "fan_mode": "medium", "last_mode": "heat"},
     )
-    with patch.object(
-        RemoteAirConditioner, "async_get_last_state", AsyncMock(return_value=last)
+    with (
+        patch.object(
+            RemoteAirConditioner, "async_get_last_state", AsyncMock(return_value=last)
+        ),
+        patch(f"{KEYS}.async_dispatcher_connect"),
     ):
         await entity.async_added_to_hass()
     assert (entity.hvac_mode, entity.target_temperature, entity.fan_mode) == (
@@ -181,8 +195,95 @@ async def test_restores_the_last_state():
 
     entity = _entity()
     last = Mock(state="dry", attributes={})
-    with patch.object(
-        RemoteAirConditioner, "async_get_last_state", AsyncMock(return_value=last)
+    with (
+        patch.object(
+            RemoteAirConditioner, "async_get_last_state", AsyncMock(return_value=last)
+        ),
+        patch(f"{KEYS}.async_dispatcher_connect"),
     ):
         await entity.async_added_to_hass()
     assert entity.hvac_mode == HVACMode.DRY
+
+
+async def test_climate_follows_codes_sent_by_anything_else():
+    entity = _entity()
+    entity._on_code_sent(
+        "remote.blaster", "ac", "frio_24", _ac(True, "cool", 24, "high")
+    )
+    assert (entity.hvac_mode, entity.target_temperature, entity.fan_mode) == (
+        HVACMode.COOL,
+        24,
+        "high",
+    )
+    entity._on_code_sent("remote.blaster", "ac", "desligar", _ac(False, "heat"))
+    assert entity.hvac_mode == HVACMode.OFF
+    assert entity.extra_state_attributes["last_mode"] == "heat"
+    assert entity.async_write_ha_state.call_count == 2
+
+
+@pytest.mark.parametrize(
+    ("remote", "device", "code"),
+    [
+        ("remote.other", "ac", "ON"),
+        ("remote.blaster", "tv", "ON"),
+        ("remote.blaster", "ac", "AAAA"),
+    ],
+)
+async def test_climate_ignores_other_codes(remote, device, code):
+    entity = _entity()
+    entity._on_code_sent(remote, device, None, _ac(True) if code == "ON" else code)
+    assert entity.hvac_mode == HVACMode.OFF
+    entity.async_write_ha_state.assert_not_called()
+
+
+def _switch():
+    control = {"id": "ac_1", "name": "Ar condicionado", "device": "ac"}
+    with patch(f"{KEYS}._control_device", return_value={}):
+        switch = RemotePowerSwitch(
+            Mock(entry_id="e1"),
+            Mock(),
+            "remote.blaster",
+            control,
+            {"on": "ligar", "off": "desligar"},
+        )
+    switch.hass = Mock()
+    switch.async_write_ha_state = Mock()
+    return switch
+
+
+def test_power_switch_follows_its_keys_pressed_anywhere():
+    switch = _switch()
+    switch._on_code_sent("remote.blaster", "ac", "ligar", "WHATEVER")
+    assert switch.is_on is True
+    switch._on_code_sent("remote.blaster", "ac", "desligar", "WHATEVER")
+    assert switch.is_on is False
+
+
+def test_power_switch_follows_the_power_an_ac_code_carries():
+    switch = _switch()
+    switch._on_code_sent("remote.blaster", "ac", None, _ac(True, "dry", 22))
+    assert switch.is_on is True
+    switch._on_code_sent("remote.blaster", "ac", "frio_off", _ac(False))
+    assert switch.is_on is False
+
+
+def test_power_switch_ignores_other_codes():
+    switch = _switch()
+    switch._on_code_sent("remote.blaster", "tv", "ligar", _ac(True))
+    switch._on_code_sent("remote.blaster", "ac", "volume", "AAAA")
+    assert switch.is_on is False
+    switch.async_write_ha_state.assert_not_called()
+
+
+async def test_power_switch_restores_its_state():
+    switch = _switch()
+    with (
+        patch.object(
+            RemotePowerSwitch,
+            "async_get_last_state",
+            AsyncMock(return_value=Mock(state="on")),
+        ),
+        patch(f"{KEYS}.async_dispatcher_connect"),
+    ):
+        await switch.async_added_to_hass()
+    assert switch.is_on is True

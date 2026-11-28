@@ -314,6 +314,15 @@ contradicts your instinct, trust the note.
   `hvac_modes` from it and exposes `temp_modes`; on a layout save `_sync` hands the new
   settings to the live entity (`apply_settings`) instead of recreating it. `renderAc`
   shows `--` and switches off − and + where the temperature does not count.
+- **Every sent code is announced (2026.11.93).** Alexa drives the power pair
+  (`switch.tuya_remote_*`, the `switch` domain is in its filter), so the climate entity
+  never heard about it and stayed "off". `TuyaLocalRemote.async_send_command` now fires
+  `SIGNAL_CODE_SENT` (remote entity id, device, command name or None for `b64:`/`rf:`,
+  code) after each code. The climate entity decodes any TCL112 code for its control
+  and takes that state; the power switch follows its own on/off names from anywhere
+  and, for an air conditioner, the power bit of any code. Both filter on remote and
+  `device`, so the climate now sends its raw codes with `device` too. The power switch
+  restores its state across restarts (RestoreEntity).
 - HA 2026.11 warns that `_attr_target_temperature` is deprecated for
   `_attr_native_target_temperature` (works until 2027.11). The test env is 2026.7,
   which has no `native_*` on `ClimateEntity`, so the switch waits for the test env.

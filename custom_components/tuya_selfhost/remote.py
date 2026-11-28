@@ -30,9 +30,11 @@ from homeassistant.components.remote import (
 from homeassistant.components.remote import DOMAIN as RM_DOMAIN
 from homeassistant.const import ATTR_COMMAND
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .const import SIGNAL_CODE_SENT
 from .device import TuyaLocalDevice
 from .entity import TuyaLocalEntity
 from .helpers.config import async_tuya_setup_platform
@@ -274,8 +276,13 @@ class TuyaLocalRemote(TuyaLocalEntity, RemoteEntity):
             _LOGGER.error("Failed to call %s: %s", service, err)
             raise
 
+        names = [
+            None if c.startswith(("b64:", "rf:")) else c for c in kwargs[ATTR_COMMAND]
+        ]
         at_least_one_sent = False
-        for _, codes in product(range(repeat), code_list):
+        for _, (name, codes) in product(
+            range(repeat), zip(names, code_list, strict=True)
+        ):
             if at_least_one_sent:
                 await asyncio.sleep(delay)
 
@@ -296,6 +303,9 @@ class TuyaLocalRemote(TuyaLocalEntity, RemoteEntity):
                 subdevice or "default device",
             )
             await self._device.async_set_properties(dps_to_set)
+            async_dispatcher_send(
+                self.hass, SIGNAL_CODE_SENT, self.entity_id, subdevice, name, code
+            )
 
             if len(codes) > 1:
                 self._flags[subdevice] ^= 1

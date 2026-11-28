@@ -265,6 +265,23 @@ class TestEncodeSendCode:
 
 
 class TestAsyncSendCommand:
+    @pytest.fixture(autouse=True)
+    def sent(self):
+        with patch(
+            "custom_components.tuya_selfhost.remote.async_dispatcher_send"
+        ) as sent:
+            yield sent
+
+    @pytest.mark.asyncio
+    async def test_every_code_sent_is_announced(self, sent):
+        remote = _make_remote()
+        remote._codes = {"ac": {"on": "ON_CODE"}}
+        await remote.async_send_command(["on", "b64:RAW"], device="ac", num_repeats=1)
+        assert [c.args[3:] for c in sent.call_args_list] == [
+            ("ac", "on", "ON_CODE"),
+            ("ac", None, "RAW"),
+        ]
+
     @pytest.mark.asyncio
     async def test_send_b64_command(self):
         remote = _make_remote()

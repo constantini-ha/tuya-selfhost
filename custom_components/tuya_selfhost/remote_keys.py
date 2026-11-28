@@ -28,9 +28,9 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import slugify
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_CODE_SENT
 from .helpers.config import get_device_id
-from .ir_ac import MAX_TEMP, MIN_TEMP, AcState, encode, template_of
+from .ir_ac import MAX_TEMP, MIN_TEMP, AcState, encode, recognize, template_of
 from .remote_card import SIGNAL_LAYOUTS, STORAGE_KEY
 
 _LOGGER = logging.getLogger(__name__)
@@ -216,6 +216,7 @@ class RemoteAirConditioner(ClimateEntity, RestoreEntity):
         self, entry, device, remote_id, control, template: str, learned: AcState
     ):
         self._remote_id = remote_id
+        self._device_name = control.get("device")
         self._template = template
         self._mode = learned.mode
         self._attr_unique_id = f"{entry.entry_id}:{control['id']}:climate"
@@ -248,6 +249,9 @@ class RemoteAirConditioner(ClimateEntity, RestoreEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_CODE_SENT, self._on_code_sent)
+        )
         last = await self.async_get_last_state()
         if last is None:
             return
@@ -261,6 +265,24 @@ class RemoteAirConditioner(ClimateEntity, RestoreEntity):
             self._attr_target_temperature = int(temperature)
         if last.attributes.get("fan_mode") in self._attr_fan_modes:
             self._attr_fan_mode = last.attributes["fan_mode"]
+
+    @callback
+    def _on_code_sent(self, remote_id, device, _name, code) -> None:
+        """Whatever sent it (Alexa, a key, an automation), the code says the new state."""
+        if remote_id != self._remote_id or device != self._device_name:
+            return
+        state = recognize(code)
+        if state is None:
+            return
+        self._mode = state.mode
+        self._attr_hvac_mode = (
+            next(m for m, v in HVAC_MODES.items() if v == state.mode)
+            if state.power
+            else HVACMode.OFF
+        )
+        self._attr_target_temperature = state.temperature
+        self._attr_fan_mode = state.fan
+        self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -283,7 +305,11 @@ class RemoteAirConditioner(ClimateEntity, RestoreEntity):
         await self.hass.services.async_call(
             "remote",
             "send_command",
-            {"entity_id": self._remote_id, "command": f"b64:{code}"},
+            {
+                "entity_id": self._remote_id,
+                "device": self._device_name,
+                "command": f"b64:{code}",
+            },
             blocking=True,
         )
 
@@ -356,7 +382,7 @@ def _alexa_config(hass: HomeAssistant):
     return None
 
 
-class RemotePowerSwitch(SwitchEntity):
+class RemotePowerSwitch(SwitchEntity, RestoreEntity):
     """An on/off key pair, so assistants see a device instead of two scenes.
 
     Infrared is one way: the state here is what we last sent, not what the
@@ -379,6 +405,31 @@ class RemotePowerSwitch(SwitchEntity):
         self._attr_device_info = _control_device(entry, device, control)
         self._attr_is_on = False
         self.entity_id = "switch." + slugify(f"{OBJECT_ID_PREFIX} {control['name']}")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, SIGNAL_CODE_SENT, self._on_code_sent)
+        )
+        last = await self.async_get_last_state()
+        if last is not None:
+            self._attr_is_on = last.state == "on"
+
+    @callback
+    def _on_code_sent(self, remote_id, device, name, code) -> None:
+        """Follow its own keys and, on an air conditioner, the power every code carries."""
+        if remote_id != self._remote_id or device != self._device_name:
+            return
+        if name is not None and name in (self._on, self._off):
+            on = name == self._on
+        else:
+            state = recognize(code)
+            if state is None:
+                return
+            on = state.power
+        if on != self._attr_is_on:
+            self._attr_is_on = on
+            self.async_write_ha_state()
 
     async def _press(self, command: str | None) -> None:
         if command is None:
