@@ -40,8 +40,6 @@ const AC_CARD_STYLE = `
   ${REMOTE_CSS}
   ha-card { background: none; box-shadow: none; border: none; overflow: hidden; }
   .remote { width: auto; margin: 0; border-radius: var(--ha-card-border-radius, 24px); }
-  .keys { margin-top: 12px; }
-  .key.sent { filter: brightness(1.5); }
 `;
 
 class TuyaSelfhostRemoteCard extends HTMLElement {
@@ -193,37 +191,6 @@ class TuyaSelfhostRemoteCard extends HTMLElement {
     brand.querySelector("span").textContent = this._config.title || control.name;
     body.append(brand, renderAc(this._hass, ac));
 
-    const taught = control.buttons.filter((b) => b.taught);
-    if (taught.length) {
-      const more = document.createElement("button");
-      more.className = "ac-more";
-      more.textContent = this._t(this._keysOpen ? "ac_keys_hide" : "ac_keys_show", {
-        n: taught.length,
-      });
-      more.addEventListener("click", () => {
-        this._keysOpen = !this._keysOpen;
-        this._render();
-      });
-      body.appendChild(more);
-    }
-    if (taught.length && this._keysOpen) {
-      const keys = document.createElement("div");
-      keys.className = "keys";
-      keys.style.gridTemplateColumns = `repeat(${control.columns || 3}, 1fr)`;
-      for (const button of taught) {
-        const slot = document.createElement("div");
-        slot.className = "keyslot";
-        const key = document.createElement("button");
-        key.className = "key";
-        key.innerHTML = `<ha-icon></ha-icon><span></span>`;
-        key.querySelector("ha-icon").setAttribute("icon", button.icon || "mdi:remote");
-        key.querySelector("span").textContent = button.name;
-        key.addEventListener("click", () => this._send(control, button, key));
-        slot.appendChild(key);
-        keys.appendChild(slot);
-      }
-      body.appendChild(keys);
-    }
     card.appendChild(body);
 
     const style = document.createElement("style");

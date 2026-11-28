@@ -3268,20 +3268,8 @@ class TuyaSelfhostPanel extends HTMLElement {
       slot.appendChild(tools);
       keys.appendChild(slot);
     });
-    // An air conditioner is run from its own controls; the taught keys stay one tap away.
-    if (ac && !this._editing) {
-      const more = document.createElement("button");
-      more.className = "ac-more";
-      more.textContent = this._t(this._acKeys ? "ac_keys_hide" : "ac_keys_show", {
-        n: control.buttons.length,
-      });
-      more.addEventListener("click", () => {
-        this._acKeys = !this._acKeys;
-        this._render();
-      });
-      body.appendChild(more);
-    }
-    if (!ac || this._editing || this._acKeys) body.appendChild(keys);
+    // An air conditioner is run from its own controls; the taught keys only show in Edit.
+    if (!ac || this._editing) body.appendChild(keys);
     card.appendChild(body);
 
     if (ac && this._editing) card.appendChild(this._renderAcSettings(control));

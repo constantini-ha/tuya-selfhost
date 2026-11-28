@@ -47,8 +47,6 @@ export const REMOTE_CSS = `
 .key.pillkey { aspect-ratio:auto; border-radius:16px; padding:12px 8px; font-size:11px }
 .key:disabled { opacity:.4; cursor:default; transform:none }
 .key.power.on { background:linear-gradient(180deg,#2E9E7A,#1F7559) }
-.ac-more { display:block; margin:12px auto 0; border:none; background:transparent; cursor:pointer;
-  color:#8E97AC; font:inherit; font-size:12px; padding:6px 10px }
 `;
 
 export function acOf(hass, controlId) {
